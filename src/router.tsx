@@ -6,6 +6,7 @@ import App from './App'
 import GamesPage from './pages/GamesPage'
 import GamePage from './pages/GamePage'
 import CluePage from './pages/CluePage'
+import ErrorPage from './pages/ErrorPage'
 import {
   gamesLoader,
   gameLoader,
@@ -16,6 +17,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
+    errorElement: <ErrorPage />,
     children: [
       {
         index: true,
