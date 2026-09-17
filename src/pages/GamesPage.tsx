@@ -1,4 +1,9 @@
-import { Link, useLoaderData, useSearchParams } from 'react-router'
+import {
+  Link,
+  useLoaderData,
+  useNavigation,
+  useSearchParams,
+} from 'react-router'
 import type {
   GameSummary,
   PageResponse,
@@ -6,14 +11,15 @@ import type {
 
 function GamesPage() {
   const data = useLoaderData() as PageResponse<GameSummary>
+  const navigation = useNavigation()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  function getPage() {
-    return Math.max(
-      0,
-      Number(searchParams.get('page') ?? '0'),
-    )
-  }
+  const page = Math.max(
+    0,
+    Number(searchParams.get('page') ?? '0'),
+  )
+
+  const isLoading = navigation.state !== 'idle'
 
   function goToPage(newPage: number) {
     const newParams = new URLSearchParams(searchParams)
@@ -26,8 +32,6 @@ function GamesPage() {
 
     setSearchParams(newParams)
   }
-
-  const page = getPage()
 
   return (
     <main>
@@ -48,7 +52,7 @@ function GamesPage() {
       <nav aria-label="Game pagination">
         <button
           type="button"
-          disabled={page === 0}
+          disabled={isLoading || page === 0}
           onClick={() => goToPage(page - 1)}
         >
           Previous
@@ -61,7 +65,10 @@ function GamesPage() {
 
         <button
           type="button"
-          disabled={page >= data.totalPages - 1}
+          disabled={
+            isLoading ||
+            page >= data.totalPages - 1
+          }
           onClick={() => goToPage(page + 1)}
         >
           Next
