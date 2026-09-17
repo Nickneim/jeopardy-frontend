@@ -1,59 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError } from '../api/errors'
-import { getGame, type Game, type GameCategory } from '../api/games'
-
-function Category({ category }: { category: GameCategory }) {
-  return (
-    <section>
-      <h2>{category.name}</h2>
-
-      {category.comments && <p>{category.comments}</p>}
-
-      <div>
-        {category.clues.map(clue => (
-          <article key={clue.id}>
-            <h3>${clue.value}</h3>
-            <p>{clue.question}</p>
-
-            {clue.clueType !== 'TEXT' && clue.mediaUrl && (
-              <p>
-                Media: <a href={clue.mediaUrl}>{clue.mediaUrl}</a>
-              </p>
-            )}
-
-            <details>
-              <summary>Answer</summary>
-              <p>{clue.answer}</p>
-            </details>
-          </article>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function Round({
-  title,
-  categories,
-}: {
-  title: string
-  categories: GameCategory[]
-}) {
-  return (
-    <section>
-      <h2>{title}</h2>
-
-      {categories.map(category => (
-        <Category key={category.id} category={category} />
-      ))}
-    </section>
-  )
-}
+import {
+  getGame,
+  type Game,
+  type GameClue,
+} from '../api/games'
+import GameBoard from '../components/GameBoard'
+import ClueModal from '../components/ClueModal'
 
 function GamePage() {
   const { id } = useParams()
+
   const [game, setGame] = useState<Game | null>(null)
+  const [selectedClue, setSelectedClue] = useState<GameClue | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -113,20 +73,38 @@ function GamePage() {
         Season {game.season} — {game.gameDate}
       </p>
 
-      <Round
-        title="Jeopardy!"
+      <h2>Jeopardy!</h2>
+
+      <GameBoard
         categories={game.jeopardyRound}
+        dailyDoubleClueIds={game.dailyDoubleClueIds}
+        onClueClick={setSelectedClue}
       />
 
-      <Round
-        title="Double Jeopardy!"
+      <h2>Double Jeopardy!</h2>
+
+      <GameBoard
         categories={game.doubleJeopardyRound}
+        dailyDoubleClueIds={game.dailyDoubleClueIds}
+        onClueClick={setSelectedClue}
       />
 
       {game.finalJeopardy && (
-        <Round
-          title="Final Jeopardy!"
-          categories={[game.finalJeopardy]}
+        <>
+          <h2>Final Jeopardy!</h2>
+
+          <GameBoard
+            categories={[game.finalJeopardy]}
+            dailyDoubleClueIds={game.dailyDoubleClueIds}
+            onClueClick={setSelectedClue}
+          />
+        </>
+      )}
+
+      {selectedClue && (
+        <ClueModal
+          clue={selectedClue}
+          onClose={() => setSelectedClue(null)}
         />
       )}
     </main>

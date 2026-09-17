@@ -15,19 +15,22 @@ export interface PageResponse<T> {
   totalPages: number
 }
 
+export type ClueType = 'TEXT' | 'IMAGE' | 'SOUND' | 'VIDEO'
+
 export interface GameClue {
   id: number
   question: string
   answer: string
-  clueType: 'TEXT' | 'IMAGE' | 'SOUND' | 'VIDEO'
+  clueType: ClueType
   mediaUrl: string | null
-  value: number
+  rowNumber: number
 }
 
 export interface GameCategory {
   id: number
   name: string
   comments: string | null
+  columnNumber: number
   clues: GameClue[]
 }
 
