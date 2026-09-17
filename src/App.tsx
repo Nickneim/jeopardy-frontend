@@ -1,30 +1,12 @@
-import { useEffect, useState } from 'react'
+import { Navigate, Route, Routes } from 'react-router'
+import GamesPage from './pages/GamesPage'
 
 function App() {
-  const [message, setMessage] = useState('Loading...')
-
-  useEffect(() => {
-    fetch('/api/games?page=0&size=5')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
-
-        return response.json()
-      })
-      .then(data => {
-        setMessage(`Found ${data.totalElements} games`)
-      })
-      .catch(error => {
-        setMessage(`Error: ${error.message}`)
-      })
-  }, [])
-
   return (
-    <main>
-      <h1>Jeopardy</h1>
-      <p>{message}</p>
-    </main>
+    <Routes>
+      <Route path="/" element={<Navigate to="/games" replace />} />
+      <Route path="/games" element={<GamesPage />} />
+    </Routes>
   )
 }
 
