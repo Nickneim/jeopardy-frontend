@@ -62,19 +62,27 @@ export function getGame(id: number): Promise<Game> {
   return get<Game>(`/games/${id}`)
 }
 
+const PAGE_SIZE = 20
+
 export function gamesLoader({
   request,
 }: LoaderFunctionArgs) {
   const url = new URL(request.url)
 
-  const page = Math.max(
-    0,
-    Number(url.searchParams.get('page') ?? '0'),
-  )
-
+  const pageParam = url.searchParams.get('page')
   const season = url.searchParams.get('season') ?? undefined
 
-  return getGames(page, 20, season)
+  const page = pageParam === null
+    ? 0
+    : Number(pageParam)
+
+  if (!Number.isInteger(page) || page < 0) {
+    throw new Response('Invalid page parameter', {
+      status: 400,
+    })
+  }
+
+  return getGames(page, PAGE_SIZE, season)
 }
 
 export function gameLoader({
