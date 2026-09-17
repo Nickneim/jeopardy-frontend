@@ -15,6 +15,33 @@ export interface PageResponse<T> {
   totalPages: number
 }
 
+export interface GameClue {
+  id: number
+  question: string
+  answer: string
+  clueType: 'TEXT' | 'IMAGE' | 'SOUND' | 'VIDEO'
+  mediaUrl: string | null
+  value: number
+}
+
+export interface GameCategory {
+  id: number
+  name: string
+  comments: string | null
+  clues: GameClue[]
+}
+
+export interface Game {
+  id: number
+  title: string
+  gameDate: string
+  season: string
+  jeopardyRound: GameCategory[]
+  doubleJeopardyRound: GameCategory[]
+  finalJeopardy: GameCategory | null
+  dailyDoubleClueIds: number[]
+}
+
 export function getGames(
   page = 0,
   size = 20,
@@ -25,4 +52,8 @@ export function getGames(
     size,
     season,
   })
+}
+
+export function getGame(id: number): Promise<Game> {
+  return get<Game>(`/games/${id}`)
 }
