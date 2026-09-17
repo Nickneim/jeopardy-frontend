@@ -1,19 +1,6 @@
 import { useEffect, useState } from 'react'
-
-interface GameSummary {
-  id: number
-  title: string
-  gameDate: string
-  season: string
-}
-
-interface PageResponse<T> {
-  content: T[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-}
+import { getGames, type GameSummary } from '../api/games'
+import { ApiError } from '../api/errors'
 
 function GamesPage() {
   const [games, setGames] = useState<GameSummary[]>([])
@@ -21,19 +8,16 @@ function GamesPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/games?page=0&size=20')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
-
-        return response.json()
-      })
-      .then((data: PageResponse<GameSummary>) => {
+    getGames()
+      .then(data => {
         setGames(data.content)
       })
       .catch(error => {
-        setError(error.message)
+        if (error instanceof ApiError) {
+          setError(error.message)
+        } else {
+          setError('An unexpected error occurred')
+        }
       })
       .finally(() => {
         setLoading(false)
