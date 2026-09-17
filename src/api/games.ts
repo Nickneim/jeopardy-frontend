@@ -1,3 +1,4 @@
+import type { LoaderFunctionArgs } from 'react-router'
 import { get } from './client'
 
 export interface GameSummary {
@@ -21,16 +22,16 @@ export interface GameClue {
   id: number
   question: string
   answer: string
+  rowNumber: number
   clueType: ClueType
   mediaUrl: string | null
-  rowNumber: number
 }
 
 export interface GameCategory {
   id: number
   name: string
-  comments: string | null
   columnNumber: number
+  comments: string | null
   clues: GameClue[]
 }
 
@@ -59,4 +60,33 @@ export function getGames(
 
 export function getGame(id: number): Promise<Game> {
   return get<Game>(`/games/${id}`)
+}
+
+export function gamesLoader({
+  request,
+}: LoaderFunctionArgs) {
+  const url = new URL(request.url)
+
+  const page = Math.max(
+    0,
+    Number(url.searchParams.get('page') ?? '0'),
+  )
+
+  const season = url.searchParams.get('season') ?? undefined
+
+  return getGames(page, 20, season)
+}
+
+export function gameLoader({
+  params,
+}: LoaderFunctionArgs) {
+  const id = Number(params.id)
+
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Response('Invalid game ID', {
+      status: 400,
+    })
+  }
+
+  return getGame(id)
 }

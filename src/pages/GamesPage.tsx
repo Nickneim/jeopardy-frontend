@@ -1,41 +1,19 @@
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { ApiError } from '../api/errors'
-import { getGames, type GameSummary, type PageResponse } from '../api/games'
-
-const PAGE_SIZE = 20
+import { Link, useLoaderData, useSearchParams } from 'react-router'
+import type {
+  GameSummary,
+  PageResponse,
+} from '../api/games'
 
 function GamesPage() {
+  const data = useLoaderData() as PageResponse<GameSummary>
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const page = Math.max(
-    0,
-    Number(searchParams.get('page') ?? '0'),
-  )
-
-  const season = searchParams.get('season') ?? undefined
-
-  const [data, setData] = useState<PageResponse<GameSummary> | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setLoading(true)
-    setError(null)
-
-    getGames(page, PAGE_SIZE, season)
-      .then(setData)
-      .catch(error => {
-        if (error instanceof ApiError) {
-          setError(error.message)
-        } else {
-          setError('An unexpected error occurred')
-        }
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [page, season])
+  function getPage() {
+    return Math.max(
+      0,
+      Number(searchParams.get('page') ?? '0'),
+    )
+  }
 
   function goToPage(newPage: number) {
     const newParams = new URLSearchParams(searchParams)
@@ -49,19 +27,11 @@ function GamesPage() {
     setSearchParams(newParams)
   }
 
-  if (!data && loading) {
-    return <p>Loading games...</p>
-  }
-
-  if (!data) {
-    return <p>{error ?? 'Unable to load games.'}</p>
-  }
+  const page = getPage()
 
   return (
     <main>
       <h1>Jeopardy Games</h1>
-
-      {error && <p>Error loading games: {error}</p>}
 
       {data.content.map(game => (
         <article key={game.id}>
@@ -78,7 +48,7 @@ function GamesPage() {
       <nav aria-label="Game pagination">
         <button
           type="button"
-          disabled={loading || page === 0}
+          disabled={page === 0}
           onClick={() => goToPage(page - 1)}
         >
           Previous
@@ -91,7 +61,7 @@ function GamesPage() {
 
         <button
           type="button"
-          disabled={loading || page >= data.totalPages - 1}
+          disabled={page >= data.totalPages - 1}
           onClick={() => goToPage(page + 1)}
         >
           Next
@@ -102,4 +72,3 @@ function GamesPage() {
 }
 
 export default GamesPage
-

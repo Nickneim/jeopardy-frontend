@@ -1,60 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
-import { ApiError } from '../api/errors'
-import { getClue, type Clue } from '../api/clues'
+import { Link, useLoaderData } from 'react-router'
+import type { Clue } from '../api/clues'
 
 function CluePage() {
-  const { id } = useParams()
-
-  const [clue, setClue] = useState<Clue | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!id) {
-      setError('Clue ID is missing')
-      setLoading(false)
-      return
-    }
-
-    const clueId = Number(id)
-
-    if (!Number.isInteger(clueId) || clueId <= 0) {
-      setError('Invalid clue ID')
-      setLoading(false)
-      return
-    }
-
-    getClue(clueId)
-      .then(setClue)
-      .catch(error => {
-        if (error instanceof ApiError) {
-          setError(error.message)
-        } else {
-          setError('An unexpected error occurred')
-        }
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [id])
-
-  if (loading) {
-    return <p>Loading clue...</p>
-  }
-
-  if (error) {
-    return (
-      <main>
-        <p>Error loading clue: {error}</p>
-        <Link to="/games">Back to games</Link>
-      </main>
-    )
-  }
-
-  if (!clue) {
-    return null
-  }
+  const clue = useLoaderData() as Clue
 
   return (
     <main>
