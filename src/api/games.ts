@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { get } from './client'
+import type { ClueType } from './clues'
 
 export interface GameSummary {
   id: number
@@ -15,8 +16,6 @@ export interface PageResponse<T> {
   totalElements: number
   totalPages: number
 }
-
-export type ClueType = 'TEXT' | 'IMAGE' | 'SOUND' | 'VIDEO'
 
 export interface GameClue {
   id: number
