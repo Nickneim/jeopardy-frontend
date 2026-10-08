@@ -11,11 +11,11 @@ const ROWS = 5
 
 function getClueValue(columnNumber: number, rowNumber: number): number {
   if (columnNumber <= 6) {
-    return rowNumber * 100
+    return rowNumber * 200
   }
 
   if (columnNumber <= 12) {
-    return rowNumber * 200
+    return rowNumber * 400
   }
 
   return 2000
