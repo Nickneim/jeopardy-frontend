@@ -215,3 +215,70 @@ p {
 .category-comments-marker {
   cursor: help;
 }
+
+.form-error,
+.session-error {
+  color: #d33;
+}
+
+.connection-status {
+  font-style: italic;
+}
+
+.live-session {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 16px 32px;
+}
+
+.scoreboard {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.scoreboard-player {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 8px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+}
+
+.scoreboard-player.is-choosing,
+.scoreboard-player.is-answering {
+  border-color: var(--accent);
+}
+
+.scoreboard-player.is-locked-out {
+  opacity: 0.6;
+}
+
+.scoreboard-name {
+  color: var(--text-h);
+}
+
+.scoreboard-score {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.scoreboard-score.negative {
+  color: #d33;
+}
+
+.scoreboard-status {
+  min-height: 1.2em;
+  font-size: 0.8rem;
+}
+
+.primary-button {
+  padding: 12px 24px;
+  font-size: 1.1rem;
+}

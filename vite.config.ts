@@ -10,6 +10,12 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // STOMP over a plain WebSocket. The Origin header stays the dev
+      // server's, which the backend allows.
+      '/ws': {
+        target: 'ws://localhost:8080',
+        ws: true,
+      },
     },
   },
 })
