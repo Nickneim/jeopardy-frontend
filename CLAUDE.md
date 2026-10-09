@@ -27,6 +27,16 @@ Vitest with jsdom and React Testing Library, configured in the `test` block of `
 - Nothing talks to the backend: API modules mock `./client`, and `useGameSession.test.ts` replaces `@stomp/stompjs`'s `Client` with a fake whose callbacks (`onConnect`, `onStompError`, subscriptions) the test calls directly.
 - Components that use router hooks or `<Form>` are rendered inside `createMemoryRouter` + `RouterProvider`, with a stub `loader`/`action` where needed.
 
+### End-to-end checks and the Stop hook
+
+- `npm run e2e` runs `scripts/e2e/` against the real backend through the dev server (both must be running): real STOMP clients play the session rules, then headless Chrome plays a whole game with several players. The `test-live-session` skill (`.claude/skills/`) says when and how to run them.
+- `.claude/settings.json` has a Stop hook, `scripts/stop-checks.mjs`, that runs build, lint and tests at the end of a turn when `src/`, `scripts/` or a config file changed since its last run. It's silent when they pass and hands failures back to Claude. Its state is in `node_modules/.cache/claude-stop-checks.json`: delete it to force a rerun.
+
+### Running against the backend
+
+- The backend runs on `http://localhost:8080` (start it from `../backend`; see its CLAUDE.md for the database environment variables).
+- `vite.config.ts` proxies `/api` to `http://localhost:8080`, so the frontend always calls relative `/api/...` URLs. The backend also allows `http://localhost:5173` via CORS, which matters for the upcoming WebSocket connection (`ws://localhost:8080/ws`), since the proxy only covers `/api`.
+
 ## Architecture
 
 ### Data flow: loaders, not effects

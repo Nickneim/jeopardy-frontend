@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/stop-checks.mjs\"",
+            "timeout": 300,
+            "statusMessage": "Checking build, lint and tests…"
+          }
+        ]
+      }
+    ]
+  }
+}
