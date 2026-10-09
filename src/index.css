@@ -391,3 +391,14 @@ p {
 .game-result {
   font-size: 1.3rem;
 }
+
+.game-filters .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+}
+
+.no-clues {
+  font-style: italic;
+}

@@ -7,6 +7,7 @@ export interface GameSummary {
   title: string
   gameDate: string
   season: string
+  clueCount: number
 }
 
 export interface PageResponse<T> {
@@ -55,6 +56,8 @@ export interface GameFilters {
   title?: string
   from?: string
   to?: string
+  // 'true' to also list games without clues, which can't be played.
+  includeUnplayable?: string
 }
 
 export interface GamesLoaderData {
@@ -68,10 +71,14 @@ export function getGames(
   size = 20,
   filters: GameFilters = {},
 ): Promise<PageResponse<GameSummary>> {
+  const { includeUnplayable, ...apiFilters } = filters
+
   return get<PageResponse<GameSummary>>('/games', {
     page,
     size,
-    ...filters,
+    ...apiFilters,
+    // Without `playable`, the backend lists both kinds.
+    playable: includeUnplayable === 'true' ? undefined : 'true',
   })
 }
 
@@ -94,7 +101,13 @@ export function getGame(id: number): Promise<Game> {
 
 const PAGE_SIZE = 20
 
-export const FILTER_PARAMS = ['season', 'title', 'from', 'to'] as const
+export const FILTER_PARAMS = [
+  'season',
+  'title',
+  'from',
+  'to',
+  'includeUnplayable',
+] as const
 
 export async function gamesLoader({
   request,

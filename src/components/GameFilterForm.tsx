@@ -36,6 +36,7 @@ function GameFilterForm({
       title: String(formData.get('title') ?? ''),
       from,
       to,
+      includeUnplayable: formData.get('playableOnly') ? '' : 'true',
     })
   }
 
@@ -87,6 +88,15 @@ function GameFilterForm({
           min={from || undefined}
           onChange={event => setTo(event.target.value)}
         />
+      </label>
+
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          name="playableOnly"
+          defaultChecked={filters.includeUnplayable !== 'true'}
+        />
+        Playable games only
       </label>
 
       <button type="submit" disabled={disabled}>

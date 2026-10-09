@@ -86,6 +86,9 @@ function GamesPage() {
 
           <p>
             Season {game.season} — {game.gameDate}
+            {game.clueCount === 0 && (
+              <span className="no-clues"> — no clues, can't be played</span>
+            )}
           </p>
         </article>
       ))}
