@@ -10,12 +10,9 @@ const apiClient = axios.create({
   baseURL: '/api',
 })
 
-export async function get<T>(
-  url: string,
-  params?: Record<string, string | number | undefined>,
-): Promise<T> {
+async function request<T>(send: () => Promise<{ data: T }>): Promise<T> {
   try {
-    const response = await apiClient.get<T>(url, { params })
+    const response = await send()
     return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -29,4 +26,18 @@ export async function get<T>(
 
     throw error
   }
+}
+
+export function get<T>(
+  url: string,
+  params?: Record<string, string | number | undefined>,
+): Promise<T> {
+  return request(() => apiClient.get<T>(url, { params }))
+}
+
+export function post<T>(
+  url: string,
+  body: unknown,
+): Promise<T> {
+  return request(() => apiClient.post<T>(url, body))
 }

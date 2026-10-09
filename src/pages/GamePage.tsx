@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { Link, useLoaderData, useLocation } from 'react-router'
+import {
+  Form,
+  Link,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
 import type {
   Game,
   GameCategory,
@@ -17,6 +23,9 @@ interface SelectedClue {
 function GamePage() {
   const game = useLoaderData() as Game
   const location = useLocation()
+  const navigation = useNavigation()
+
+  const isCreatingSession = navigation.state === 'submitting'
 
   const [selected, setSelected] =
     useState<SelectedClue | null>(null)
@@ -34,6 +43,14 @@ function GamePage() {
       <p>
         Season {game.season} — {game.gameDate}
       </p>
+
+      <Form method="post" action="/sessions">
+        <input type="hidden" name="gameId" value={game.id} />
+
+        <button type="submit" disabled={isCreatingSession}>
+          {isCreatingSession ? 'Creating…' : 'Host live game'}
+        </button>
+      </Form>
 
       <h2>Jeopardy!</h2>
 

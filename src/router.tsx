@@ -7,11 +7,17 @@ import GamesPage from './pages/GamesPage'
 import GamePage from './pages/GamePage'
 import CluePage from './pages/CluePage'
 import ErrorPage from './pages/ErrorPage'
+import SessionPage from './pages/SessionPage'
 import {
   gamesLoader,
   gameLoader,
 } from './api/games'
 import { clueLoader } from './api/clues'
+import {
+  createSessionAction,
+  joinSessionAction,
+  sessionLoader,
+} from './api/sessions'
 
 const router = createBrowserRouter([
   {
@@ -37,6 +43,16 @@ const router = createBrowserRouter([
         path: 'clues/:id',
         element: <CluePage />,
         loader: clueLoader,
+      },
+      {
+        path: 'sessions',
+        action: createSessionAction,
+      },
+      {
+        path: 'sessions/:id',
+        element: <SessionPage />,
+        loader: sessionLoader,
+        action: joinSessionAction,
       },
     ],
   },
