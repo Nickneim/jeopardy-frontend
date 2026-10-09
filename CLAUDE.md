@@ -45,9 +45,13 @@ The games list keeps its filters and page in the URL search params (`season`, `t
 - `GET /api/games/{id}` does **not** return clue values, so `components/GameBoard.tsx` computes them from `columnNumber` and `rowNumber`. Keep this consistent with the backend's rules (`Clue.getValue()` / `api.md`). Rows can have gaps, so the board always renders 5 rows and shows an empty cell where a category has no clue for that row.
 - Clue questions contain HTML from the database and are rendered with `dangerouslySetInnerHTML`. Clues may carry media (`clueType` `IMAGE` / `VIDEO` / `SOUND` with `mediaUrl`).
 
-### Not built yet
+### Live game sessions
 
-The live multiplayer game (game sessions over STOMP WebSockets: player tokens sent as the `player-token` CONNECT header, `GameSessionResponse` broadcasts on `/topic/sessions/{id}`, errors on `/user/queue/errors`) is fully specified in `../backend/docs/api.md` but not implemented here yet. The current pages only browse game content over REST.
+- "Host live game" on a game page posts to the `sessions` route action, which creates a session and redirects to `/sessions/:id`. Joining is that route's action. `src/api/sessions.ts` holds the session types (mirroring `api.md` §8), the REST calls, the loader/actions, and the player token storage (`localStorage`, keyed by session id).
+- **The player token is a secret**: only ever send it in the STOMP `player-token` CONNECT header. Never display, log, or put it in a URL.
+- `src/hooks/useGameSession.ts` owns the STOMP connection (`@stomp/stompjs`, plain WebSocket to `/ws`, forwarded by `vite.config.ts`). The server sends full snapshots, so the hook only keeps the one with the highest `version`, and it fetches the state over REST after every (re)connect. A STOMP ERROR before connecting means the backend rejected the token (e.g. the session was lost in a backend restart): the hook forgets it, and the page revalidates to show the join form. The hook reads its `initial` session only on mount, so `SessionPage` remounts the live view (via `key`) when the token changes.
+- Components under `src/components/session/` render from the latest snapshot, switching on `state`. Countdowns come from `phaseRemainingMs` measured from when the snapshot arrived (`receivedAt`, `performance.now()`), never from the client's clock.
+- There's no winner field: `GameResult` takes the highest final score, with ties.
 
 ## Code style
 
