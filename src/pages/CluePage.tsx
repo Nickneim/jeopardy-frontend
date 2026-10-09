@@ -1,17 +1,27 @@
-import { Link, useLoaderData } from 'react-router'
+import { Link, useLoaderData, useLocation } from 'react-router'
 import type { Clue } from '../api/clues'
 
 function CluePage() {
   const clue = useLoaderData() as Clue
+  const location = useLocation()
 
   return (
     <main>
-      <Link to="/games">← Back to games</Link>
+      <Link
+        to={`/games/${clue.gameId}`}
+        state={location.state}
+      >
+        ← Back to game
+      </Link>
 
       <h1>{clue.categoryName}</h1>
 
+      {clue.categoryComments && (
+        <p className="category-comments">{clue.categoryComments}</p>
+      )}
+
       <p>
-        Value: ${clue.value}
+        {clue.isFinalClue ? 'Final Jeopardy!' : `Value: $${clue.value}`}
       </p>
 
       {clue.clueType === 'IMAGE' && clue.mediaUrl && (
@@ -39,6 +49,13 @@ function CluePage() {
         className="clue-question"
         dangerouslySetInnerHTML={{ __html: clue.question }}
       />
+
+      <details>
+        <summary>Show Answer</summary>
+        <p className="clue-answer">
+          {clue.answer}
+        </p>
+      </details>
     </main>
   )
 }

@@ -4,7 +4,7 @@ import ClueCell from './ClueCell'
 interface GameBoardProps {
   categories: GameCategory[]
   dailyDoubleClueIds: number[]
-  onClueClick: (clue: GameClue) => void
+  onClueClick: (clue: GameClue, category: GameCategory) => void
 }
 
 const ROWS = 5
@@ -32,8 +32,16 @@ function GameBoard({
     <div className="game-board">
       {categories.map(category => (
         <div className="category-column" key={category.id}>
-          <div className="category-header">
+          <div
+            className="category-header"
+            title={category.comments ?? undefined}
+          >
             {category.name}
+            {category.comments && (
+              <span className="category-comments-marker" aria-hidden="true">
+                {' '}ⓘ
+              </span>
+            )}
           </div>
 
           {Array.from({ length: ROWS }, (_, rowIndex) => {
@@ -46,7 +54,7 @@ function GameBoard({
                 key={rowIndex}
                 clue={clue}
                 dailyDouble={clue !== undefined && dailyDoubleIds.has(clue.id)}
-                onClick={onClueClick}
+                onClick={clue => onClueClick(clue, category)}
                 value={getClueValue(category.columnNumber, rowIndex + 1)}
               />
             )

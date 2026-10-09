@@ -32,6 +32,8 @@ Pages get their data from **react-router loaders**, not `useEffect` fetches. `sr
 
 Loaders validate route/search params themselves and `throw new Response(message, { status: 400 })` on bad input. All route errors (thrown `Response`s and `ApiError`s) render the single root `errorElement`, `src/pages/ErrorPage.tsx`, which distinguishes the two.
 
+The games list keeps its filters and page in the URL search params (`season`, `title`, `from`, `to`, `page`). Links from the list pass `{ gamesSearch: location.search }` as router location state (`src/navigation.ts`), and the game and clue pages forward it on their links, so "Back to games" returns to the same filtered page. Keep forwarding `location.state` on any new links between these pages.
+
 ### API layer (`src/api/`)
 
 - `client.ts`: one axios instance with `baseURL: '/api'` and a generic `get<T>(url, params)` helper. It converts axios errors into `ApiError` (`errors.ts`) using the backend's `ApiErrorResponse` body (`{status, message}`), falling back to the HTTP status. Add new HTTP verbs here in the same style rather than calling axios from feature modules.

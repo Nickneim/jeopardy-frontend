@@ -11,6 +11,7 @@ export interface Clue {
   mediaUrl: string | null
   value: number
   isFinalClue: boolean
+  gameId: number
   categoryId: number
   categoryName: string
   categoryComments: string | null

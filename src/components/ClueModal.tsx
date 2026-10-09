@@ -1,14 +1,19 @@
-import type { GameClue } from '../api/games'
+import { Link, useLocation } from 'react-router'
+import type { GameCategory, GameClue } from '../api/games'
 
 interface ClueModalProps {
   clue: GameClue
+  category: GameCategory
   onClose: () => void
 }
 
 function ClueModal({
   clue,
+  category,
   onClose,
 }: ClueModalProps) {
+  const location = useLocation()
+
   return (
     <div
       className="clue-modal-backdrop"
@@ -28,6 +33,12 @@ function ClueModal({
         </button>
 
         <div className="clue-modal-content">
+          <h2 className="clue-category">{category.name}</h2>
+
+          {category.comments && (
+            <p className="category-comments">{category.comments}</p>
+          )}
+
           {clue.clueType === 'IMAGE' && clue.mediaUrl && (
             <img
               src={clue.mediaUrl}
@@ -60,6 +71,13 @@ function ClueModal({
               {clue.answer}
             </p>
           </details>
+
+          <Link
+            to={`/clues/${clue.id}`}
+            state={location.state}
+          >
+            Open clue page
+          </Link>
         </div>
       </div>
     </div>

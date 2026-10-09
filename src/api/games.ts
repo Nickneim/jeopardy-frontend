@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from 'react-router'
+import { redirect, type LoaderFunctionArgs } from 'react-router'
 import { get } from './client'
 import type { ClueType } from './clues'
 
@@ -45,16 +45,38 @@ export interface Game {
   dailyDoubleClueIds: number[]
 }
 
+export interface Season {
+  season: string
+  gameCount: number
+}
+
+export interface GameFilters {
+  season?: string
+  title?: string
+  from?: string
+  to?: string
+}
+
+export interface GamesLoaderData {
+  games: PageResponse<GameSummary>
+  seasons: Season[]
+  filters: GameFilters
+}
+
 export function getGames(
   page = 0,
   size = 20,
-  season?: string,
+  filters: GameFilters = {},
 ): Promise<PageResponse<GameSummary>> {
   return get<PageResponse<GameSummary>>('/games', {
     page,
     size,
-    season,
+    ...filters,
   })
+}
+
+export function getSeasons(): Promise<Season[]> {
+  return get<Season[]>('/games/seasons')
 }
 
 export function getGame(id: number): Promise<Game> {
@@ -63,13 +85,14 @@ export function getGame(id: number): Promise<Game> {
 
 const PAGE_SIZE = 20
 
-export function gamesLoader({
+export const FILTER_PARAMS = ['season', 'title', 'from', 'to'] as const
+
+export async function gamesLoader({
   request,
-}: LoaderFunctionArgs) {
+}: LoaderFunctionArgs): Promise<GamesLoaderData> {
   const url = new URL(request.url)
 
   const pageParam = url.searchParams.get('page')
-  const season = url.searchParams.get('season') ?? undefined
 
   const page = pageParam === null
     ? 0
@@ -81,7 +104,28 @@ export function gamesLoader({
     })
   }
 
-  return getGames(page, PAGE_SIZE, season)
+  const filters: GameFilters = {}
+
+  for (const name of FILTER_PARAMS) {
+    const value = url.searchParams.get(name)?.trim()
+
+    if (value) {
+      filters[name] = value
+    }
+  }
+
+  const [games, seasons] = await Promise.all([
+    getGames(page, PAGE_SIZE, filters),
+    getSeasons(),
+  ])
+
+  // Past the last page (e.g. a stale link): go to the last page instead.
+  if (games.totalPages > 0 && page >= games.totalPages) {
+    url.searchParams.set('page', String(games.totalPages - 1))
+    throw redirect(`${url.pathname}?${url.searchParams}`)
+  }
+
+  return { games, seasons, filters }
 }
 
 export function gameLoader({
