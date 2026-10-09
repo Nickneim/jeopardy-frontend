@@ -75,8 +75,17 @@ export function getGames(
   })
 }
 
+// Seasons only change when games are imported, so fetch them once per page load.
+let seasonsPromise: Promise<Season[]> | undefined
+
 export function getSeasons(): Promise<Season[]> {
-  return get<Season[]>('/games/seasons')
+  seasonsPromise ??= get<Season[]>('/games/seasons').catch(error => {
+    // Don't cache a failure: let the next navigation retry.
+    seasonsPromise = undefined
+    throw error
+  })
+
+  return seasonsPromise
 }
 
 export function getGame(id: number): Promise<Game> {
