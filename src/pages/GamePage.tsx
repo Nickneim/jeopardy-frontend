@@ -27,6 +27,13 @@ function GamePage() {
 
   const isCreatingSession = navigation.state === 'submitting'
 
+  // Some imported games have no clues, and can't be played.
+  const hasClues = [
+    ...game.jeopardyRound,
+    ...game.doubleJeopardyRound,
+    ...(game.finalJeopardy ? [game.finalJeopardy] : []),
+  ].some(category => category.clues.length > 0)
+
   const [selected, setSelected] =
     useState<SelectedClue | null>(null)
 
@@ -44,13 +51,17 @@ function GamePage() {
         Season {game.season} — {game.gameDate}
       </p>
 
-      <Form method="post" action="/sessions">
-        <input type="hidden" name="gameId" value={game.id} />
+      {hasClues
+        ? (
+          <Form method="post" action="/sessions">
+            <input type="hidden" name="gameId" value={game.id} />
 
-        <button type="submit" disabled={isCreatingSession}>
-          {isCreatingSession ? 'Creating…' : 'Host live game'}
-        </button>
-      </Form>
+            <button type="submit" disabled={isCreatingSession}>
+              {isCreatingSession ? 'Creating…' : 'Host live game'}
+            </button>
+          </Form>
+        )
+        : <p>This game has no clues yet.</p>}
 
       <h2>Jeopardy!</h2>
 
