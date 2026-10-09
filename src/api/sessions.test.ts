@@ -57,6 +57,18 @@ describe('sessionsLoader', () => {
     expect(get).toHaveBeenCalledWith('/game-sessions', { page: 1, size: 20 })
   })
 
+  test('asks for finished games too with finished=true', async () => {
+    vi.mocked(get).mockResolvedValue(page(1))
+
+    await sessionsLoader(args('http://localhost/sessions?finished=true'))
+
+    expect(get).toHaveBeenCalledWith('/game-sessions', {
+      page: 0,
+      size: 20,
+      includeFinished: 'true',
+    })
+  })
+
   test.each(['-1', '1.5', 'abc'])('rejects page=%s with a 400', async value => {
     const response = await thrown(
       sessionsLoader(args(`http://localhost/sessions?page=${value}`)),

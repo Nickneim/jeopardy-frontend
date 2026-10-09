@@ -32,6 +32,7 @@ function SessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const page = sessions.page
+  const showFinished = searchParams.get('finished') === 'true'
   const isLoading = navigation.state !== 'idle' ||
     revalidator.state !== 'idle'
 
@@ -45,6 +46,11 @@ function SessionsPage() {
     }
 
     setSearchParams(newParams)
+  }
+
+  // Back to the first page, since the list changes.
+  function toggleFinished(show: boolean) {
+    setSearchParams(show ? { finished: 'true' } : {})
   }
 
   return (
@@ -62,8 +68,18 @@ function SessionsPage() {
         </button>
       </p>
 
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          checked={showFinished}
+          disabled={isLoading}
+          onChange={event => toggleFinished(event.target.checked)}
+        />
+        Show finished games
+      </label>
+
       {sessions.content.length === 0 && (
-        <p>No live games right now.</p>
+        <p>{showFinished ? 'No games right now.' : 'No live games right now.'}</p>
       )}
 
       {sessions.content.map(session => (

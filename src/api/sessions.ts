@@ -170,10 +170,13 @@ export function createSession(gameId: number): Promise<{ id: string }> {
 export function getSessions(
   page = 0,
   size = 20,
+  includeFinished = false,
 ): Promise<PageResponse<GameSessionSummary>> {
   return get<PageResponse<GameSessionSummary>>('/game-sessions', {
     page,
     size,
+    // Without it, the backend leaves finished games out.
+    includeFinished: includeFinished ? 'true' : undefined,
   })
 }
 
@@ -288,7 +291,11 @@ export async function sessionsLoader({
     })
   }
 
-  const sessions = await getSessions(page, PAGE_SIZE)
+  const sessions = await getSessions(
+    page,
+    PAGE_SIZE,
+    url.searchParams.get('finished') === 'true',
+  )
 
   // Past the last page (e.g. sessions closed since): go to the last page.
   if (sessions.totalPages > 0 && page >= sessions.totalPages) {
