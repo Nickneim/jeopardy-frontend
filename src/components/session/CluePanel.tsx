@@ -5,6 +5,9 @@ import ClueMedia from '../ClueMedia'
 import AnswerForm from './AnswerForm'
 import BuzzButton from './BuzzButton'
 import ClueAnswers from './ClueAnswers'
+import WagerForm from './WagerForm'
+
+const MIN_DAILY_DOUBLE_WAGER = 5
 
 interface CluePanelProps {
   session: GameSession
@@ -35,6 +38,17 @@ function CluePanel({
   const canBuzz = me !== null &&
     session.state === 'WAITING_FOR_BUZZER' &&
     !isLockedOut
+  const isMyWager = me !== null &&
+    session.state === 'WAITING_FOR_DAILY_DOUBLE_WAGER' &&
+    session.playerChoosingClue === me.id
+
+  // The most a player can wager: their score, or the round's top clue value.
+  const highestValue = Math.max(
+    0,
+    ...session.board.flatMap(c => c.slots.map(slot => slot.value ?? 0)),
+  )
+  const maxDailyDoubleWager = Math.max(me?.score ?? 0, highestValue)
+
   const isMyAnswer = me !== null &&
     session.state === 'WAITING_FOR_ANSWER' &&
     session.playerAnswering === me.id
@@ -72,6 +86,19 @@ function CluePanel({
         <p className="clue-answer">
           Correct response: {clue.answer}
         </p>
+      )}
+
+      {isMyWager && (
+        <WagerForm
+          min={MIN_DAILY_DOUBLE_WAGER}
+          max={maxDailyDoubleWager}
+          submitLabel="Place wager"
+          onSubmit={actions.placeDailyDoubleWager}
+        />
+      )}
+
+      {session.state === 'WAITING_FOR_DAILY_DOUBLE_WAGER' && !isMyWager && (
+        <p>{playerName(session.playerChoosingClue)} is placing a wager…</p>
       )}
 
       {me && !clue.dailyDouble &&
