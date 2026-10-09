@@ -215,8 +215,58 @@ function storePlayer(sessionId: string, player: JoinedPlayer) {
 export function forgetPlayer(sessionId: string) {
   try {
     localStorage.removeItem(storageKey(sessionId))
+    localStorage.removeItem(finalJeopardyKey(sessionId))
   } catch {
     // Nothing to forget.
+  }
+}
+
+// The server hides Final Jeopardy wagers and answers until the reveal, so
+// the player's own are kept here to show them back, even after a refresh.
+export interface SentFinalJeopardy {
+  wager: number | null
+  answer: string | null
+}
+
+interface StoredFinalJeopardy extends SentFinalJeopardy {
+  playerId: number
+}
+
+function finalJeopardyKey(sessionId: string): string {
+  return `jeopardy.finalJeopardy.${sessionId}`
+}
+
+export function getSentFinalJeopardy(
+  sessionId: string,
+  playerId: number,
+): SentFinalJeopardy {
+  try {
+    const stored = localStorage.getItem(finalJeopardyKey(sessionId))
+    const sent = stored ? JSON.parse(stored) as StoredFinalJeopardy : null
+
+    // Someone who left and rejoined is a new player with nothing sent.
+    if (sent?.playerId === playerId) {
+      return { wager: sent.wager, answer: sent.answer }
+    }
+  } catch {
+    // Fall through: nothing sent that we know of.
+  }
+
+  return { wager: null, answer: null }
+}
+
+export function rememberSentFinalJeopardy(
+  sessionId: string,
+  playerId: number,
+  sent: SentFinalJeopardy,
+) {
+  try {
+    localStorage.setItem(
+      finalJeopardyKey(sessionId),
+      JSON.stringify({ playerId, ...sent }),
+    )
+  } catch {
+    // Without storage it's only lost on a refresh.
   }
 }
 

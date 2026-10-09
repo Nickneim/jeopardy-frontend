@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import type { GameSession, Player } from '../../api/sessions'
+import {
+  getSentFinalJeopardy,
+  rememberSentFinalJeopardy,
+  type GameSession,
+  type Player,
+  type SentFinalJeopardy,
+} from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
 import { formatMoney } from '../../format'
 import AnswerForm from './AnswerForm'
@@ -17,9 +23,12 @@ function FinalJeopardyPanel({
   actions,
 }: FinalJeopardyPanelProps) {
   // Wagers and answers stay hidden from everyone until the reveal, so the
-  // player's own are remembered here to show them back.
-  const [myWager, setMyWager] = useState<number | null>(null)
-  const [myAnswer, setMyAnswer] = useState<string | null>(null)
+  // player's own are remembered to show them back, across refreshes too.
+  const [sent, setSent] = useState<SentFinalJeopardy>(() => me
+    ? getSentFinalJeopardy(session.id, me.id)
+    : { wager: null, answer: null })
+  const myWager = sent.wager
+  const myAnswer = sent.answer
 
   const final = session.finalJeopardy
 
@@ -30,13 +39,22 @@ function FinalJeopardyPanel({
   const isRevealed = session.state === 'FINAL_JEOPARDY_REVEALING' ||
     session.state === 'FINISHED_GAME'
 
+  function remember(update: Partial<SentFinalJeopardy>) {
+    const next = { ...sent, ...update }
+    setSent(next)
+
+    if (me) {
+      rememberSentFinalJeopardy(session.id, me.id, next)
+    }
+  }
+
   function placeWager(wager: number) {
-    setMyWager(wager)
+    remember({ wager })
     actions.placeFinalJeopardyWager(wager)
   }
 
   function answer(text: string) {
-    setMyAnswer(text)
+    remember({ answer: text })
     actions.answerFinalJeopardy(text)
   }
 
