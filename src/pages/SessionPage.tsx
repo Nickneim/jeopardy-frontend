@@ -149,8 +149,7 @@ function LiveSession({
       return
     }
 
-    // Don't wait for the server's ERROR frame: it often doesn't arrive
-    // before the server closes the connection.
+    // No need to wait for the server's ERROR frame to say so.
     onTokenRejected('You left the game.')
   }
 

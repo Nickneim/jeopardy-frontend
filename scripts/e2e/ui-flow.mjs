@@ -180,7 +180,9 @@ try {
     const li = [...document.querySelectorAll('.scoreboard-player')].find(li => li.textContent.includes('Carol'))
     li.querySelector('.kick-button').click()
   })()`)
-  check('kicked player stays on as a spectator', await carol.waitText("You're watching as a spectator", 8000))
+  check('kicked player stays on as a spectator and is told why',
+    await carol.waitText("You're watching as a spectator", 8000) &&
+    (await carol.text()).includes('You were removed from the session by the host'))
   check('kicked player disappears from the host scoreboard',
     await (async () => { await sleep(500); return !(await alice.text()).includes('Carol') })())
 

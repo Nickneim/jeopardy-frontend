@@ -8,7 +8,6 @@ import {
   api,
   APP,
   check,
-  expectBestEffort,
   finish,
   preflight,
   sleep,
@@ -116,9 +115,7 @@ async function main() {
   await waitFor(() => c.connected)
   a.send('kick', { playerId: carol.playerId })
   await waitFor(() => c.stompErrors.length > 0)
-  // Backend bug: the ERROR frame is often lost when the server closes the
-  // socket right after it. The frontend copes, so this only warns.
-  expectBestEffort('kicked player gets ERROR after connect with a reason',
+  check('kicked player gets ERROR after connect with a reason',
     c.stompErrors[0]?.afterConnect === true && !!c.stompErrors[0]?.message,
     JSON.stringify(c.stompErrors[0]))
   await waitFor(() => !watcher.latest()?.players.some(p => p.id === carol.playerId))
@@ -156,7 +153,7 @@ async function main() {
   // Bob leaves without a role (Alice is choosing).
   b.send('leave')
   await waitFor(() => b.stompErrors.length > 0)
-  expectBestEffort('leaving player gets ERROR after connect with a reason',
+  check('leaving player gets ERROR after connect with a reason',
     b.stompErrors[0]?.afterConnect === true && !!b.stompErrors[0]?.message,
     JSON.stringify(b.stompErrors[0]))
   await waitFor(() => !watcher.latest()?.players.some(p => p.id === bob.playerId))

@@ -6,25 +6,16 @@ export const APP = process.env.APP_URL ?? 'http://localhost:5173'
 export const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 let failures = 0
-let warnings = 0
 
 export function check(name, ok, detail = '') {
   if (!ok) failures++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
-// For behavior the backend doesn't deliver reliably yet: reported, but
-// doesn't fail the run.
-export function expectBestEffort(name, ok, detail = '') {
-  if (!ok) warnings++
-  console.log(`${ok ? 'PASS' : 'WARN'} ${name}${detail ? ` — ${detail}` : ''}`)
-}
-
 export function finish(label) {
-  const warned = warnings ? `, ${warnings} warning(s)` : ''
   console.log(failures === 0
-    ? `\nAll ${label} checks passed${warned}`
-    : `\n${failures} ${label} check(s) failed${warned}`)
+    ? `\nAll ${label} checks passed`
+    : `\n${failures} ${label} check(s) failed`)
   process.exit(failures === 0 ? 0 : 1)
 }
 
