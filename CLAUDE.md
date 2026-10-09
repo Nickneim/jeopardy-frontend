@@ -14,15 +14,18 @@ The **backend** is a separate Spring Boot repository in the sibling folder `../b
 npm run dev       # Vite dev server on http://localhost:5173
 npm run build     # type-check (tsc -b) + production build
 npm run lint      # ESLint
+npm test          # Vitest, once (npm run test:watch to rerun on save)
 npm run preview   # serve the production build
 ```
 
-There is no test runner configured. `npm run build` is the type check.
+`npm run build` is also the type check, and it covers the test files.
 
-### Running against the backend
+### Tests
 
-- The backend runs on `http://localhost:8080` (start it from `../backend`; see its CLAUDE.md for the database environment variables).
-- `vite.config.ts` proxies `/api` to `http://localhost:8080`, so the frontend always calls relative `/api/...` URLs. The backend also allows `http://localhost:5173` via CORS, which matters for the upcoming WebSocket connection (`ws://localhost:8080/ws`), since the proxy only covers `/api`.
+Vitest with jsdom and React Testing Library, configured in the `test` block of `vite.config.ts`. Tests sit next to the code they test (`*.test.ts(x)`) and import `describe`/`test`/`expect`/`vi` from `vitest` explicitly (no globals). `src/test/setup.ts` adds the jest-dom matchers and clears the DOM and `localStorage` after each test; `src/test/fixtures.ts` has `makeSession()`/`makePlayer()` for `GameSession` data.
+
+- Nothing talks to the backend: API modules mock `./client`, and `useGameSession.test.ts` replaces `@stomp/stompjs`'s `Client` with a fake whose callbacks (`onConnect`, `onStompError`, subscriptions) the test calls directly.
+- Components that use router hooks or `<Form>` are rendered inside `createMemoryRouter` + `RouterProvider`, with a stub `loader`/`action` where needed.
 
 ## Architecture
 
