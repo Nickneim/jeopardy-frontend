@@ -6,6 +6,7 @@ import {
 import { get, post } from './client'
 import type { ClueType } from './clues'
 import { ApiError } from './errors'
+import type { PageResponse } from './games'
 
 export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
 
@@ -21,6 +22,10 @@ export type GameSessionState =
   | 'FINAL_JEOPARDY_ANSWERING'
   | 'FINAL_JEOPARDY_REVEALING'
   | 'FINISHED_GAME'
+  // Only in a removed session's last broadcast.
+  | 'CLOSED'
+
+export type SessionCloseReason = 'ABANDONED' | 'IDLE' | 'FINISHED'
 
 export type GameErrorCode =
   | 'SESSION_NOT_FOUND'
@@ -32,12 +37,32 @@ export type GameErrorCode =
   | 'INVALID_WAGER'
   | 'INVALID_REQUEST'
   | 'UNAUTHENTICATED'
+  | 'NOT_HOST'
+  | 'PLAYER_NOT_FOUND'
 
 export interface Player {
   id: number
   name: string
   score: number
+  // Left (or was kicked) but still holds a role; removed when it ends.
+  leaving: boolean
 }
+
+// Phase durations in milliseconds.
+export interface SessionTimers {
+  clueChoiceMs: number
+  clueRevealMs: number
+  dailyDoubleWagerMs: number
+  buzzerMs: number
+  answerMs: number
+  answerRevealMs: number
+  finalJeopardyWagerMs: number
+  finalJeopardyAnswerMs: number
+  finalJeopardyRevealMs: number
+}
+
+export const MIN_TIMER_MS = 1000
+export const MAX_TIMER_MS = 300000
 
 export type ClueSlotStatus = 'AVAILABLE' | 'PLAYED' | 'EMPTY'
 
@@ -93,9 +118,17 @@ export interface GameSession {
   version: number
   round: GameRound
   state: GameSessionState
+  closeReason: SessionCloseReason | null
   phaseDurationMs: number | null
   phaseRemainingMs: number | null
+  timers: SessionTimers
+  // Whether players can join after the start. Only the host changes it,
+  // before the start.
+  allowLateJoin: boolean
+  // The score a player who joins now starts with, never above 0.
+  joinScore: number
   players: Player[]
+  hostPlayerId: number | null
   playerChoosingClue: number | null
   playerAnswering: number | null
   playersLockedOut: number[]
@@ -110,6 +143,21 @@ export interface GameSessionError {
   message: string
 }
 
+export interface GameSessionSummary {
+  id: string
+  gameId: number | null
+  gameTitle: string | null
+  state: GameSessionState
+  round: GameRound
+  playerCount: number
+  hostName: string | null
+  createdAt: string
+  // Whether a join would be accepted right now.
+  joinable: boolean
+  allowLateJoin: boolean
+  joinScore: number
+}
+
 export interface JoinedPlayer {
   playerId: number
   token: string
@@ -117,6 +165,16 @@ export interface JoinedPlayer {
 
 export function createSession(gameId: number): Promise<{ id: string }> {
   return post<{ id: string }>('/game-sessions', { gameId })
+}
+
+export function getSessions(
+  page = 0,
+  size = 20,
+): Promise<PageResponse<GameSessionSummary>> {
+  return get<PageResponse<GameSessionSummary>>('/game-sessions', {
+    page,
+    size,
+  })
 }
 
 export function getSession(id: string): Promise<GameSession> {
@@ -160,6 +218,35 @@ export function forgetPlayer(sessionId: string) {
   } catch {
     // Nothing to forget.
   }
+}
+
+const PAGE_SIZE = 20
+
+export async function sessionsLoader({
+  request,
+}: LoaderFunctionArgs): Promise<PageResponse<GameSessionSummary>> {
+  const url = new URL(request.url)
+  const pageParam = url.searchParams.get('page')
+
+  const page = pageParam === null
+    ? 0
+    : Number(pageParam)
+
+  if (!Number.isInteger(page) || page < 0) {
+    throw new Response('Invalid page parameter', {
+      status: 400,
+    })
+  }
+
+  const sessions = await getSessions(page, PAGE_SIZE)
+
+  // Past the last page (e.g. sessions closed since): go to the last page.
+  if (sessions.totalPages > 0 && page >= sessions.totalPages) {
+    url.searchParams.set('page', String(sessions.totalPages - 1))
+    throw redirect(`${url.pathname}?${url.searchParams}`)
+  }
+
+  return sessions
 }
 
 export interface SessionLoaderData {
@@ -227,8 +314,12 @@ export async function joinSessionAction({
   try {
     storePlayer(id, await joinSession(id, playerName))
   } catch (error) {
-    // A rejected name is shown on the form; anything else is a route error.
-    if (error instanceof ApiError && error.status === 400) {
+    // A rejected name, or a game that stopped accepting players since the
+    // page loaded, is shown on the form; anything else is a route error.
+    if (
+      error instanceof ApiError &&
+      (error.status === 400 || error.status === 409)
+    ) {
       return { error: error.message }
     }
 

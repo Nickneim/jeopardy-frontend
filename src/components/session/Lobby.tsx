@@ -1,15 +1,25 @@
 import { useState } from 'react'
+import type { SessionTimers } from '../../api/sessions'
+import TimerSettings from './TimerSettings'
 
 interface LobbyProps {
-  playerCount: number
-  canStart: boolean
+  isHost: boolean
+  hostName: string | null
+  timers: SessionTimers
+  allowLateJoin: boolean
   onStart: () => void
+  onUpdateTimers: (timers: SessionTimers) => void
+  onUpdateSettings: (settings: { allowLateJoin: boolean }) => void
 }
 
 function Lobby({
-  playerCount,
-  canStart,
+  isHost,
+  hostName,
+  timers,
+  allowLateJoin,
   onStart,
+  onUpdateTimers,
+  onUpdateSettings,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false)
 
@@ -31,18 +41,50 @@ function Lobby({
         </button>
       </p>
 
-      {canStart
+      {isHost
         ? (
           <button
             type="button"
             className="primary-button"
-            disabled={playerCount === 0}
             onClick={onStart}
           >
             Start game
           </button>
         )
-        : <p>Waiting for a player to start the game…</p>}
+        : (
+          <p>
+            {hostName
+              ? `Waiting for ${hostName} to start the game…`
+              : 'Waiting for a player to join…'}
+          </p>
+        )}
+
+      {isHost
+        ? (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={allowLateJoin}
+              onChange={event => onUpdateSettings({
+                allowLateJoin: event.target.checked,
+              })}
+            />
+            Let players join after the game starts
+          </label>
+        )
+        : (
+          <p>
+            {allowLateJoin
+              ? 'Players can join after the game starts.'
+              : 'Nobody can join after the game starts.'}
+          </p>
+        )}
+
+      <TimerSettings
+        timers={timers}
+        canEdit={isHost}
+        onSave={onUpdateTimers}
+      />
     </section>
   )
 }

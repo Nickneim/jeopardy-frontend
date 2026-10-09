@@ -1,7 +1,17 @@
 import { Form, useActionData, useNavigation } from 'react-router'
 import type { JoinActionData } from '../../api/sessions'
+import { formatMoney } from '../../format'
 
-function JoinForm() {
+interface JoinFormProps {
+  joinScore: number
+  // Back to watching, without joining.
+  onCancel: () => void
+}
+
+function JoinForm({
+  joinScore,
+  onCancel,
+}: JoinFormProps) {
   const actionData = useActionData() as JoinActionData | undefined
   const navigation = useNavigation()
 
@@ -16,12 +26,21 @@ function JoinForm() {
           required
           maxLength={40}
           autoComplete="nickname"
+          autoFocus
         />
       </label>
 
       <button type="submit" disabled={isJoining}>
         {isJoining ? 'Joining…' : 'Join game'}
       </button>
+
+      <button type="button" disabled={isJoining} onClick={onCancel}>
+        Just watch
+      </button>
+
+      {joinScore < 0 && (
+        <p>You'll start with {formatMoney(joinScore)}.</p>
+      )}
 
       {actionData?.error && (
         <p className="form-error" role="alert">{actionData.error}</p>

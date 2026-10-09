@@ -4,6 +4,7 @@ import {
   getSession,
   type GameSession,
   type GameSessionError,
+  type SessionTimers,
 } from '../api/sessions'
 import { ApiError } from '../api/errors'
 
@@ -27,6 +28,11 @@ export interface SessionActions {
   placeDailyDoubleWager: (wager: number) => void
   placeFinalJeopardyWager: (wager: number) => void
   answerFinalJeopardy: (answer: string) => void
+  updateTimers: (timers: Partial<SessionTimers>) => void
+  updateSettings: (settings: { allowLateJoin: boolean }) => void
+  kick: (playerId: number) => void
+  // False if it couldn't be sent (not connected).
+  leave: () => boolean
 }
 
 const ERROR_VISIBLE_MS = 5000
@@ -45,11 +51,15 @@ function brokerUrl(): string {
  *
  * `initial` is only read on mount: remount (with a `key`) to start over
  * from new loader data, e.g. when the token changes.
+ *
+ * `onTokenRejected` gets the server's reason when the player was connected
+ * and then left or was kicked, and `null` when the token was rejected on
+ * CONNECT (e.g. the session was lost in a backend restart).
  */
 export function useGameSession(
   initial: GameSession,
   token: string | null,
-  onTokenRejected: () => void,
+  onTokenRejected: (reason: string | null) => void,
 ) {
   const sessionId = initial.id
 
@@ -118,12 +128,14 @@ export function useGameSession(
           })
       },
 
-      // The backend only sends ERROR when it rejects the token on CONNECT
-      // (e.g. the session was lost in a backend restart).
-      onStompError: () => {
-        if (token && !connected) {
+      // The backend only sends ERROR when the token stops working: it
+      // rejects it on CONNECT, or closes the connection after a leave or kick.
+      onStompError: frame => {
+        if (token) {
           void client.deactivate()
-          onTokenRejectedRef.current()
+          onTokenRejectedRef.current(
+            connected ? frame.headers.message ?? null : null,
+          )
         }
       },
 
@@ -142,9 +154,18 @@ export function useGameSession(
     }
   }, [sessionId, token])
 
+  // A closed session sends nothing more, and would reject a reconnect.
+  const isClosed = snapshot.session.state === 'CLOSED'
+
+  useEffect(() => {
+    if (isClosed) {
+      void clientRef.current?.deactivate()
+    }
+  }, [isClosed])
+
   useEffect(() => () => window.clearTimeout(errorTimerRef.current), [])
 
-  function send(action: string, body?: object) {
+  function send(action: string, body?: object): boolean {
     const client = clientRef.current
 
     if (!client?.connected) {
@@ -152,7 +173,7 @@ export function useGameSession(
         code: 'INVALID_STATE',
         message: 'Not connected to the game. Reconnecting…',
       })
-      return
+      return false
     }
 
     client.publish({
@@ -160,6 +181,7 @@ export function useGameSession(
       headers: { 'content-type': 'application/json' },
       body: body ? JSON.stringify(body) : '',
     })
+    return true
   }
 
   const actions: SessionActions = {
@@ -173,6 +195,10 @@ export function useGameSession(
       send('place-final-jeopardy-wager', { wager }),
     answerFinalJeopardy: answer =>
       send('answer-final-jeopardy', { answer }),
+    updateTimers: timers => send('update-timers', timers),
+    updateSettings: settings => send('update-settings', settings),
+    kick: playerId => send('kick', { playerId }),
+    leave: () => send('leave'),
   }
 
   return { ...snapshot, status, error, actions }
