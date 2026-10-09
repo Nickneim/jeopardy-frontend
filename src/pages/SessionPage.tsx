@@ -10,6 +10,8 @@ import {
 import ClueAnswers from '../components/session/ClueAnswers'
 import CluePanel from '../components/session/CluePanel'
 import Countdown from '../components/session/Countdown'
+import FinalJeopardyPanel from '../components/session/FinalJeopardyPanel'
+import GameResult from '../components/session/GameResult'
 import JoinForm from '../components/session/JoinForm'
 import Lobby from '../components/session/Lobby'
 import Scoreboard from '../components/session/Scoreboard'
@@ -22,6 +24,13 @@ const CLUE_STATES = new Set<GameSessionState>([
   'WAITING_FOR_BUZZER',
   'WAITING_FOR_ANSWER',
   'REVEALING_ANSWER',
+])
+
+const FINAL_JEOPARDY_STATES = new Set<GameSessionState>([
+  'FINAL_JEOPARDY_WAGERING',
+  'FINAL_JEOPARDY_ANSWERING',
+  'FINAL_JEOPARDY_REVEALING',
+  'FINISHED_GAME',
 ])
 
 const ROUND_NAMES: Record<GameRound, string> = {
@@ -128,6 +137,18 @@ function LiveSession({
 
       {CLUE_STATES.has(session.state) && (
         <CluePanel session={session} me={me} actions={actions} />
+      )}
+
+      {session.state === 'FINISHED_GAME' && (
+        <GameResult players={session.players} />
+      )}
+
+      {FINAL_JEOPARDY_STATES.has(session.state) && (
+        <FinalJeopardyPanel session={session} me={me} actions={actions} />
+      )}
+
+      {session.state === 'FINISHED_GAME' && (
+        <Link to="/games">Play another game</Link>
       )}
     </main>
   )

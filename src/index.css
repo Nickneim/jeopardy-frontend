@@ -369,3 +369,25 @@ p {
   font-weight: bold;
   border-radius: 999px;
 }
+
+.final-jeopardy-table {
+  border-collapse: collapse;
+}
+
+.final-jeopardy-table th,
+.final-jeopardy-table td {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.final-jeopardy-table .correct {
+  color: #2a7d2a;
+}
+
+.final-jeopardy-table .wrong {
+  color: #d33;
+}
+
+.game-result {
+  font-size: 1.3rem;
+}
