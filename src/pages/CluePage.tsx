@@ -1,5 +1,6 @@
 import { Link, useLoaderData, useLocation } from 'react-router'
 import type { Clue } from '../api/clues'
+import ClueMedia from '../components/ClueMedia'
 
 function CluePage() {
   const clue = useLoaderData() as Clue
@@ -24,26 +25,10 @@ function CluePage() {
         {clue.isFinalClue ? 'Final Jeopardy!' : `Value: $${clue.value}`}
       </p>
 
-      {clue.clueType === 'IMAGE' && clue.mediaUrl && (
-        <img
-          src={clue.mediaUrl}
-          alt=""
-        />
-      )}
-
-      {clue.clueType === 'VIDEO' && clue.mediaUrl && (
-        <video
-          controls
-          src={clue.mediaUrl}
-        />
-      )}
-
-      {clue.clueType === 'SOUND' && clue.mediaUrl && (
-        <audio
-          controls
-          src={clue.mediaUrl}
-        />
-      )}
+      <ClueMedia
+        clueType={clue.clueType}
+        mediaUrl={clue.mediaUrl}
+      />
 
       <div
         className="clue-question"

@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router'
 import type { GameCategory, GameClue } from '../api/games'
+import ClueMedia from './ClueMedia'
 
 interface ClueModalProps {
   clue: GameClue
@@ -39,26 +40,10 @@ function ClueModal({
             <p className="category-comments">{category.comments}</p>
           )}
 
-          {clue.clueType === 'IMAGE' && clue.mediaUrl && (
-            <img
-              src={clue.mediaUrl}
-              alt=""
-            />
-          )}
-
-          {clue.clueType === 'VIDEO' && clue.mediaUrl && (
-            <video
-              controls
-              src={clue.mediaUrl}
-            />
-          )}
-
-          {clue.clueType === 'SOUND' && clue.mediaUrl && (
-            <audio
-              controls
-              src={clue.mediaUrl}
-            />
-          )}
+          <ClueMedia
+            clueType={clue.clueType}
+            mediaUrl={clue.mediaUrl}
+          />
 
           <p
             className="clue-question"
