@@ -1,6 +1,7 @@
 import { Link, useLoaderData, useLocation } from 'react-router'
 import type { Clue } from '../api/clues'
 import ClueMedia from '../components/ClueMedia'
+import { formatCorrectResponse } from '../format'
 
 function CluePage() {
   const clue = useLoaderData() as Clue
@@ -38,7 +39,7 @@ function CluePage() {
       <details>
         <summary>Show Answer</summary>
         <p className="clue-answer">
-          {clue.answer}
+          {formatCorrectResponse(clue.answer)}
         </p>
       </details>
     </main>

@@ -7,6 +7,7 @@ import {
   useRevalidator,
 } from 'react-router'
 import {
+  clueAnswersRound,
   forgetPlayer,
   getStoredPlayer,
   type GameSession,
@@ -223,6 +224,8 @@ function LiveSession({
           <ClueAnswers
             answers={session.clueAnswers}
             players={session.players}
+            round={clueAnswersRound(session)}
+            me={me}
           />
 
           <p>

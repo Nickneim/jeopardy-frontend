@@ -87,6 +87,9 @@ export interface CurrentClue {
   question: string | null
   clueType: ClueType | null
   mediaUrl: string | null
+  // Only an exact number is accepted (api.md §6.7). Hidden like `question`.
+  numberExpected: boolean | null
+  // "(N of) A | B" for alternatives: show it with formatCorrectResponse.
   answer: string | null
 }
 
@@ -94,6 +97,8 @@ export interface ClueAnswer {
   playerId: number
   answer: string | null
   correct: boolean
+  // Set in every round, null when the player ran out of time (api.md §6.7).
+  phrasedAsQuestion: boolean | null
 }
 
 export interface FinalJeopardyPlayer {
@@ -103,12 +108,17 @@ export interface FinalJeopardyPlayer {
   wager: number | null
   answer: string | null
   correct: boolean | null
+  // Revealed with `correct`, null without an answer.
+  phrasedAsQuestion: boolean | null
 }
 
 export interface FinalJeopardy {
   category: string
   categoryComments: string | null
   question: string | null
+  // Only an exact number is accepted (api.md §6.7). Null while wagering.
+  numberExpected: boolean | null
+  // "(N of) A | B" for alternatives: show it with formatCorrectResponse.
   answer: string | null
   players: FinalJeopardyPlayer[]
 }
@@ -136,6 +146,19 @@ export interface GameSession {
   currentClue: CurrentClue | null
   clueAnswers: ClueAnswer[]
   finalJeopardy: FinalJeopardy | null
+}
+
+// The round `clueAnswers` were given in. They stay on screen in the next
+// CHOOSING_CLUE, so right after Jeopardy ends they still belong to the Jeopardy
+// round while `round` is already Double Jeopardy: no clue played on the board
+// yet means they're from the previous round.
+export function clueAnswersRound(session: GameSession): GameRound {
+  const nothingPlayed = !session.board.some(category =>
+    category.slots.some(slot => slot.status === 'PLAYED'))
+
+  return session.round === 'DOUBLE_JEOPARDY' && nothingPlayed
+    ? 'JEOPARDY'
+    : session.round
 }
 
 export interface GameSessionError {

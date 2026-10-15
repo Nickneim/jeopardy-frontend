@@ -1,6 +1,6 @@
-import type { GameSession, Player } from '../../api/sessions'
+import { clueAnswersRound, type GameSession, type Player } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
-import { formatMoney } from '../../format'
+import { formatCorrectResponse, formatMoney } from '../../format'
 import ClueMedia from '../ClueMedia'
 import AnswerForm from './AnswerForm'
 import BuzzButton from './BuzzButton'
@@ -80,11 +80,16 @@ function CluePanel({
         />
       )}
 
-      <ClueAnswers answers={session.clueAnswers} players={session.players} />
+      <ClueAnswers
+        answers={session.clueAnswers}
+        players={session.players}
+        round={clueAnswersRound(session)}
+        me={me}
+      />
 
       {session.state === 'REVEALING_ANSWER' && clue.answer && (
         <p className="clue-answer">
-          Correct response: {clue.answer}
+          Correct response: {formatCorrectResponse(clue.answer)}
         </p>
       )}
 
@@ -115,6 +120,7 @@ function CluePanel({
         <AnswerForm
           label="Your answer"
           submitLabel="Answer"
+          numberExpected={clue.numberExpected === true}
           onSubmit={actions.answer}
         />
       )}

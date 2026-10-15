@@ -4,6 +4,7 @@ import { makeSession, SESSION_ID } from '../test/fixtures'
 import { get, post } from './client'
 import { ApiError } from './errors'
 import {
+  clueAnswersRound,
   createSessionAction,
   getStoredPlayer,
   joinSessionAction,
@@ -178,5 +179,30 @@ describe('joinSessionAction', () => {
 
     await expect(joinSessionAction(args(url, params, { playerName: 'Bob' })))
       .rejects.toThrow('Game session not found')
+  })
+})
+
+describe('clueAnswersRound', () => {
+  function board(status: 'AVAILABLE' | 'PLAYED') {
+    return [{
+      name: 'POTPOURRI',
+      comments: null,
+      slots: [{ row: 1, clueId: 7, value: 400, status }],
+    }]
+  }
+
+  test('is the current round once a clue of it has been chosen', () => {
+    expect(clueAnswersRound(makeSession({ round: 'JEOPARDY', board: board('PLAYED') })))
+      .toBe('JEOPARDY')
+    expect(clueAnswersRound(makeSession({ round: 'DOUBLE_JEOPARDY', board: board('PLAYED') })))
+      .toBe('DOUBLE_JEOPARDY')
+  })
+
+  test('is still the Jeopardy round before the first Double Jeopardy clue', () => {
+    expect(clueAnswersRound(makeSession({
+      round: 'DOUBLE_JEOPARDY',
+      state: 'CHOOSING_CLUE',
+      board: board('AVAILABLE'),
+    }))).toBe('JEOPARDY')
   })
 })

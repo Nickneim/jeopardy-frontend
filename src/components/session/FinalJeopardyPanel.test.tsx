@@ -18,6 +18,7 @@ function finalJeopardy(state: GameSession['state']): GameSession {
       category: 'WORLD CAPITALS',
       categoryComments: null,
       question: state === 'FINAL_JEOPARDY_ANSWERING' ? 'Its name means "good air"' : null,
+      numberExpected: state === 'FINAL_JEOPARDY_WAGERING' ? null : false,
       answer: null,
       players: [{
         playerId: 1,
@@ -26,6 +27,7 @@ function finalJeopardy(state: GameSession['state']): GameSession {
         wager: null,
         answer: null,
         correct: null,
+        phrasedAsQuestion: null,
       }],
     },
   })

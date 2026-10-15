@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router'
 import type { GameCategory, GameClue } from '../api/games'
+import { formatCorrectResponse } from '../format'
 import ClueMedia from './ClueMedia'
 
 interface ClueModalProps {
@@ -53,7 +54,7 @@ function ClueModal({
           <details>
             <summary>Show Answer</summary>
             <p className="clue-answer">
-              {clue.answer}
+              {formatCorrectResponse(clue.answer)}
             </p>
           </details>
 

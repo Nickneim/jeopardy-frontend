@@ -7,7 +7,7 @@ import {
   type SentFinalJeopardy,
 } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
-import { formatMoney } from '../../format'
+import { formatCorrectResponse, formatMoney } from '../../format'
 import AnswerForm from './AnswerForm'
 import WagerForm from './WagerForm'
 
@@ -105,13 +105,14 @@ function FinalJeopardyPanel({
           <AnswerForm
             label="Your answer"
             submitLabel={myAnswer === null ? 'Answer' : 'Change answer'}
+            numberExpected={final.numberExpected === true}
             onSubmit={answer}
           />
         </>
       )}
 
       {isRevealed && final.answer && (
-        <p className="clue-answer">Correct response: {final.answer}</p>
+        <p className="clue-answer">Correct response: {formatCorrectResponse(final.answer)}</p>
       )}
 
       <table className="final-jeopardy-table">
@@ -149,6 +150,9 @@ function FinalJeopardyPanel({
                       <td className={result.correct ? 'correct' : 'wrong'}>
                         {result.correct ? '✓' : '✗'}{' '}
                         {result.answer ?? <em>no answer</em>}
+                        {!result.correct && result.phrasedAsQuestion === false && (
+                          <em> (not phrased as a question)</em>
+                        )}
                       </td>
                       <td>{formatMoney(result.wager ?? 0)}</td>
                     </>
