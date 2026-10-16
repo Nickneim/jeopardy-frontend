@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import {
-  Form,
   Link,
+  useFetcher,
   useLoaderData,
   useLocation,
-  useNavigation,
 } from 'react-router'
 import type {
   Game,
   GameCategory,
   GameClue,
 } from '../api/games'
+import {
+  getRememberedPlayerName,
+  type JoinActionData,
+} from '../api/sessions'
 import GameBoard from '../components/GameBoard'
 import ClueModal from '../components/ClueModal'
 import { gamesListPath } from '../navigation'
@@ -23,9 +26,10 @@ interface SelectedClue {
 function GamePage() {
   const game = useLoaderData() as Game
   const location = useLocation()
-  const navigation = useNavigation()
-
-  const isCreatingSession = navigation.state === 'submitting'
+  // The live games route's action creates the session and joins it, and its
+  // errors (such as a rejected name) show here.
+  const hostFetcher = useFetcher<JoinActionData>()
+  const isHosting = hostFetcher.state !== 'idle'
 
   // Some imported games have no clues, and can't be played.
   const hasClues = [
@@ -53,13 +57,34 @@ function GamePage() {
 
       {hasClues
         ? (
-          <Form method="post" action="/sessions">
+          <hostFetcher.Form
+            method="post"
+            action="/sessions"
+            className="host-form"
+          >
             <input type="hidden" name="gameId" value={game.id} />
 
-            <button type="submit" disabled={isCreatingSession}>
-              {isCreatingSession ? 'Creating…' : 'Host live game'}
+            <label>
+              Your name
+              <input
+                name="playerName"
+                required
+                maxLength={40}
+                autoComplete="nickname"
+                defaultValue={getRememberedPlayerName()}
+              />
+            </label>
+
+            <button type="submit" disabled={isHosting}>
+              {isHosting ? 'Creating…' : 'Host live game'}
             </button>
-          </Form>
+
+            {hostFetcher.data?.error && (
+              <p className="form-error" role="alert">
+                {hostFetcher.data.error}
+              </p>
+            )}
+          </hostFetcher.Form>
         )
         : <p>This game has no clues yet.</p>}
 

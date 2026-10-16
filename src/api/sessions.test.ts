@@ -6,6 +6,7 @@ import { ApiError } from './errors'
 import {
   clueAnswersRound,
   createSessionAction,
+  getRememberedPlayerName,
   getStoredPlayer,
   joinSessionAction,
   sessionLoader,
@@ -117,15 +118,47 @@ describe('sessionLoader', () => {
 })
 
 describe('createSessionAction', () => {
-  test('creates the session and redirects to it', async () => {
-    vi.mocked(post).mockResolvedValue({ id: SESSION_ID })
+  test('creates the session, joins it as the host and redirects to it', async () => {
+    vi.mocked(post)
+      .mockResolvedValueOnce({ id: SESSION_ID })
+      .mockResolvedValueOnce({ playerId: 1, token: 'secret' })
 
     const response = await createSessionAction(
-      args('http://localhost/sessions', {}, { gameId: '735' }),
+      args('http://localhost/sessions', {}, { gameId: '735', playerName: ' Alice ' }),
     )
 
-    expect(post).toHaveBeenCalledWith('/game-sessions', { gameId: 735 })
-    expect(response.headers.get('Location')).toBe(`/sessions/${SESSION_ID}`)
+    expect(post).toHaveBeenNthCalledWith(1, '/game-sessions', { gameId: 735 })
+    expect(post).toHaveBeenNthCalledWith(
+      2,
+      `/game-sessions/${SESSION_ID}/players`,
+      { playerName: 'Alice' },
+    )
+    expect(getStoredPlayer(SESSION_ID)).toEqual({ playerId: 1, token: 'secret' })
+    expect(getRememberedPlayerName()).toBe('Alice')
+    expect((response as Response).headers.get('Location'))
+      .toBe(`/sessions/${SESSION_ID}`)
+  })
+
+  test('asks for a name without creating a session', async () => {
+    const result = await createSessionAction(
+      args('http://localhost/sessions', {}, { gameId: '735', playerName: ' ' }),
+    )
+
+    expect(result).toEqual({ error: 'Enter your name to host.' })
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  test('shows a name the backend rejects on the form', async () => {
+    vi.mocked(post)
+      .mockResolvedValueOnce({ id: SESSION_ID })
+      .mockRejectedValueOnce(new ApiError(400, 'Name too long'))
+
+    const result = await createSessionAction(
+      args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
+    )
+
+    expect(result).toEqual({ error: 'Name too long' })
+    expect(getStoredPlayer(SESSION_ID)).toBeNull()
   })
 
   test('rejects an invalid game id with a 400', async () => {

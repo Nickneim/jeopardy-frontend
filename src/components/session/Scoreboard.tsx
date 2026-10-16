@@ -1,5 +1,6 @@
 import type { GameSession, Player } from '../../api/sessions'
 import { formatMoney } from '../../format'
+import ConfirmButton from './ConfirmButton'
 
 interface ScoreboardProps {
   session: GameSession
@@ -64,13 +65,13 @@ function Scoreboard({
             </span>
 
             {canKick && (
-              <button
-                type="button"
+              <ConfirmButton
+                label="Kick"
+                question={`Remove ${player.name} from the game?`}
+                confirmLabel="Yes, kick"
                 className="kick-button"
-                onClick={() => onKick?.(player)}
-              >
-                Kick
-              </button>
+                onConfirm={() => onKick?.(player)}
+              />
             )}
           </li>
         )

@@ -1,4 +1,3 @@
-import type { FormEvent } from 'react'
 import {
   MAX_TIMER_MS,
   MIN_TIMER_MS,
@@ -22,7 +21,7 @@ const TIMER_FIELDS = Object.keys(TIMER_LABELS) as (keyof SessionTimers)[]
 interface TimerSettingsProps {
   timers: SessionTimers
   canEdit: boolean
-  onSave: (timers: SessionTimers) => void
+  onSave: (timers: Partial<SessionTimers>) => void
 }
 
 function TimerSettings({
@@ -30,17 +29,25 @@ function TimerSettings({
   canEdit,
   onSave,
 }: TimerSettingsProps) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  // Saves one field when the host leaves it, kept within the backend's
+  // bounds. An empty or unreadable value goes back to the saved one.
+  function saveField(field: keyof SessionTimers, input: HTMLInputElement) {
+    const seconds = Number(input.value)
 
-    const formData = new FormData(event.currentTarget)
-    const updated = { ...timers }
-
-    for (const field of TIMER_FIELDS) {
-      updated[field] = Math.round(Number(formData.get(field)) * 1000)
+    if (input.value.trim() === '' || !Number.isFinite(seconds)) {
+      input.value = String(timers[field] / 1000)
+      return
     }
 
-    onSave(updated)
+    const ms = Math.min(
+      MAX_TIMER_MS,
+      Math.max(MIN_TIMER_MS, Math.round(seconds * 1000)),
+    )
+    input.value = String(ms / 1000)
+
+    if (ms !== timers[field]) {
+      onSave({ [field]: ms })
+    }
   }
 
   if (!canEdit) {
@@ -60,34 +67,38 @@ function TimerSettings({
     )
   }
 
-  // Remounts when the timers change, so the inputs show the saved values.
   return (
-    <form
-      key={JSON.stringify(timers)}
-      className="timer-settings"
-      onSubmit={handleSubmit}
-    >
+    <section className="timer-settings">
       <h2>Timers (seconds)</h2>
+
+      <p className="timer-settings-note">
+        Changes are saved as soon as you leave a field.
+      </p>
 
       <div className="timer-fields">
         {TIMER_FIELDS.map(field => (
           <label key={field}>
             {TIMER_LABELS[field]}
+            {/* Remounts when the saved value changes, to show it. */}
             <input
+              key={timers[field]}
               type="number"
               name={field}
-              required
               min={MIN_TIMER_MS / 1000}
               max={MAX_TIMER_MS / 1000}
               step="any"
               defaultValue={timers[field] / 1000}
+              onBlur={event => saveField(field, event.currentTarget)}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur()
+                }
+              }}
             />
           </label>
         ))}
       </div>
-
-      <button type="submit">Save timers</button>
-    </form>
+    </section>
   )
 }
 

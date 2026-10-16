@@ -1,5 +1,8 @@
 import { Form, useActionData, useNavigation } from 'react-router'
-import type { JoinActionData } from '../../api/sessions'
+import {
+  getRememberedPlayerName,
+  type JoinActionData,
+} from '../../api/sessions'
 import { formatMoney } from '../../format'
 
 interface JoinFormProps {
@@ -26,6 +29,7 @@ function JoinForm({
           required
           maxLength={40}
           autoComplete="nickname"
+          defaultValue={getRememberedPlayerName()}
           autoFocus
         />
       </label>

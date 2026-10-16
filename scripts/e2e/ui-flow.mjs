@@ -76,8 +76,11 @@ async function newPlayer(name) {
   })
   await send('Runtime.enable', {}, sessionId)
   await send('Page.enable', {}, sessionId)
-  // window.confirm would block a headless page: always answer OK.
-  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.confirm = () => true' }, sessionId)
+  // Some browsers answer window.confirm with false without showing it, so the
+  // app asks on the page instead. Using it again fails the console check.
+  await send('Page.addScriptToEvaluateOnNewDocument', {
+    source: "window.confirm = () => { throw new Error('window.confirm used: ask on the page instead') }",
+  }, sessionId)
   page.eval = async expression => {
     const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description)
@@ -105,6 +108,11 @@ async function newPlayer(name) {
     await page.eval(`document.querySelector('input[name=playerName]').value = ${JSON.stringify(playerName)}`)
     await page.click('Join game')
   }
+  // Hosting from a game page also joins as the host.
+  page.host = async playerName => {
+    await page.eval(`document.querySelector('.host-form input[name=playerName]').value = ${JSON.stringify(playerName)}`)
+    await page.click('Host live game')
+  }
   page.screenshot = async file => {
     const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, sessionId)
     writeFileSync(join(OUT, file), Buffer.from(data, 'base64'))
@@ -120,16 +128,15 @@ try {
   // Host from the game page, like a user.
   await alice.goto(`${APP}/games/${GAME_ID}`)
   check('game page has Host live game', await alice.waitText('Host live game'))
-  await alice.click('Host live game')
-  check('hosting lands on the session page', await alice.waitText('Your name'))
-  const sessionUrl = await alice.eval('location.href')
-
-  await alice.join('Alice')
-  check('host sees "(host)", Start game and timer form',
+  await alice.host('Alice')
+  check('hosting joins as the host in one step, with editable timers',
     await alice.waitText('Playing as Alice (host)') &&
     (await alice.text()).includes('Start game') &&
-    (await alice.text()).includes('Save timers') &&
+    (await alice.text()).includes('Changes are saved as soon as you leave a field') &&
+    !(await alice.text()).includes('Save timers') &&
     (await alice.text()).includes('Let players join after the game starts'))
+
+  const sessionUrl = await alice.eval('location.href')
 
   // The live games list.
   await bob.goto(`${APP}/sessions`)
@@ -140,14 +147,19 @@ try {
   await bob.join('Bob')
   check('non-host sees waiting message and read-only timers',
     await bob.waitText('Waiting for Alice to start the game') &&
-    !(await bob.text()).includes('Save timers') &&
+    !(await bob.text()).includes('Changes are saved') &&
     (await bob.text()).includes('Buzzer'))
   check('host sees Kick on Bob', await alice.waitText('Kick'))
 
   // Timers.
-  await alice.eval(`document.querySelector('input[name=buzzerMs]').value = '8'`)
-  await alice.click('Save timers')
-  check('timer change reaches the other player', await bob.waitText('8s'))
+  // Leaving the field saves it (React's onBlur listens to focusout).
+  await alice.eval(`(() => {
+    const input = document.querySelector('input[name=buzzerMs]')
+    input.value = '8'
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  })()`)
+  check('timer change saves on leaving the field and reaches the other player',
+    await bob.waitText('8s'))
   check('host form shows the saved value',
     await alice.eval(`document.querySelector('input[name=buzzerMs]').value`) === '8')
 
@@ -180,6 +192,8 @@ try {
     const li = [...document.querySelectorAll('.scoreboard-player')].find(li => li.textContent.includes('Carol'))
     li.querySelector('.kick-button').click()
   })()`)
+  check('kicking asks on the page first', await alice.waitText('Remove Carol from the game?'))
+  await alice.click('Yes, kick')
   check('kicked player stays on as a spectator and is told why',
     await carol.waitText("You're watching as a spectator", 8000) &&
     (await carol.text()).includes('You were removed from the session by the host'))
@@ -195,6 +209,9 @@ try {
 
   // Bob leaves mid-game.
   await bob.click('Leave game')
+  check('leaving mid-game asks on the page first',
+    await bob.waitText('Your score will be lost'))
+  await bob.click('Yes, leave')
   check('leaving player sees the notice and no join form',
     await bob.waitText('You left the game.') &&
     await bob.waitText("doesn't accept new players"))
@@ -203,6 +220,9 @@ try {
 
   // Alice, the last player, leaves: back to the list, session gone.
   await alice.click('Leave game')
+  check('the last player is told leaving closes the game',
+    await alice.waitText('leaving closes this game'))
+  await alice.click('Yes, leave')
   check('last player leaving goes to the live games list',
     await alice.waitText('Live Games') && (await alice.eval('location.pathname')) === '/sessions')
   check('watcher sees the closed view', await carol.waitText('Everyone left, so this game has ended.'))
@@ -212,9 +232,7 @@ try {
   const frank = await newPlayer('Frank')
   await alice.goto(`${APP}/games/${GAME_ID}`)
   await alice.waitText('Host live game')
-  await alice.click('Host live game')
-  await alice.waitText('Your name')
-  await alice.join('Alice')
+  await alice.host('Alice')
   await alice.waitText('Start game')
   await alice.click('Start game')
   await alice.waitText('Your turn: choose a clue')

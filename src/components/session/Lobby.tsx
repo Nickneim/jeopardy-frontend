@@ -8,7 +8,7 @@ interface LobbyProps {
   timers: SessionTimers
   allowLateJoin: boolean
   onStart: () => void
-  onUpdateTimers: (timers: SessionTimers) => void
+  onUpdateTimers: (timers: Partial<SessionTimers>) => void
   onUpdateSettings: (settings: { allowLateJoin: boolean }) => void
 }
 

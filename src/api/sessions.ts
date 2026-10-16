@@ -238,6 +238,25 @@ function storePlayer(sessionId: string, player: JoinedPlayer) {
   }
 }
 
+// The last name used to host or join, to fill in the next time.
+const PLAYER_NAME_KEY = 'jeopardy.playerName'
+
+export function getRememberedPlayerName(): string {
+  try {
+    return localStorage.getItem(PLAYER_NAME_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function rememberPlayerName(playerName: string) {
+  try {
+    localStorage.setItem(PLAYER_NAME_KEY, playerName)
+  } catch {
+    // The form just starts empty next time.
+  }
+}
+
 export function forgetPlayer(sessionId: string) {
   try {
     localStorage.removeItem(storageKey(sessionId))
@@ -358,11 +377,18 @@ export async function sessionLoader({
   }
 }
 
+export interface JoinActionData {
+  error: string
+}
+
+// Hosting is creating a session and joining it as its first player, who
+// becomes the host.
 export async function createSessionAction({
   request,
-}: ActionFunctionArgs) {
+}: ActionFunctionArgs): Promise<JoinActionData | Response> {
   const formData = await request.formData()
   const gameId = Number(formData.get('gameId'))
+  const playerName = String(formData.get('playerName') ?? '').trim()
 
   if (!Number.isInteger(gameId) || gameId <= 0) {
     throw new Response('Invalid game ID', {
@@ -370,13 +396,13 @@ export async function createSessionAction({
     })
   }
 
+  if (!playerName) {
+    return { error: 'Enter your name to host.' }
+  }
+
   const { id } = await createSession(gameId)
 
-  return redirect(`/sessions/${id}`)
-}
-
-export interface JoinActionData {
-  error: string
+  return await joinAsPlayer(id, playerName) ?? redirect(`/sessions/${id}`)
 }
 
 export async function joinSessionAction({
@@ -391,8 +417,18 @@ export async function joinSessionAction({
     return { error: 'Enter a name to join.' }
   }
 
+  return await joinAsPlayer(id, playerName) ?? redirect(`/sessions/${id}`)
+}
+
+// Joins and keeps the token. Returns null on success, or the error to show
+// on the form.
+async function joinAsPlayer(
+  id: string,
+  playerName: string,
+): Promise<JoinActionData | null> {
   try {
     storePlayer(id, await joinSession(id, playerName))
+    rememberPlayerName(playerName)
   } catch (error) {
     // A rejected name, or a game that stopped accepting players since the
     // page loaded, is shown on the form; anything else is a route error.
@@ -406,5 +442,5 @@ export async function joinSessionAction({
     throw error
   }
 
-  return redirect(`/sessions/${id}`)
+  return null
 }

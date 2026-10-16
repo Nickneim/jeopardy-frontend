@@ -19,6 +19,7 @@ import {
 } from '../api/sessions'
 import ClueAnswers from '../components/session/ClueAnswers'
 import CluePanel from '../components/session/CluePanel'
+import ConfirmButton from '../components/session/ConfirmButton'
 import Countdown from '../components/session/Countdown'
 import FinalJeopardyPanel from '../components/session/FinalJeopardyPanel'
 import GameResult from '../components/session/GameResult'
@@ -121,24 +122,17 @@ function LiveSession({
   const hostName = session.players
     .find(p => p.id === session.hostPlayerId)?.name ?? null
 
+  const isLastPlayer = !session.players
+    .some(p => p.id !== me?.id && !p.leaving)
+  const isPlaying = session.state !== 'WAITING_FOR_START' &&
+    session.state !== 'FINISHED_GAME'
+  const leaveQuestion = isLastPlayer
+    ? "You're the only player left, so leaving closes this game. Leave?"
+    : isPlaying
+      ? 'Leave the game? Your score will be lost.'
+      : null
+
   function leave() {
-    const isLastPlayer = !session.players
-      .some(p => p.id !== me?.id && !p.leaving)
-    const isPlaying = session.state !== 'WAITING_FOR_START' &&
-      session.state !== 'FINISHED_GAME'
-
-    if (isLastPlayer) {
-      if (!window.confirm(
-        "You're the only player left, so leaving closes this game. Leave?",
-      )) {
-        return
-      }
-    } else if (isPlaying && !window.confirm(
-      'Leave the game? Your score will be lost, and rejoining starts from $0.',
-    )) {
-      return
-    }
-
     if (!actions.leave()) {
       return
     }
@@ -155,9 +149,7 @@ function LiveSession({
   }
 
   function kick(target: Player) {
-    if (window.confirm(`Remove ${target.name} from the game?`)) {
-      actions.kick(target.id)
-    }
+    actions.kick(target.id)
   }
 
   return (
@@ -183,7 +175,12 @@ function LiveSession({
           <p>
             Playing as <strong>{me.name}</strong>
             {isHost && ' (host)'}{' '}
-            <button type="button" onClick={leave}>Leave game</button>
+            <ConfirmButton
+              label="Leave game"
+              question={leaveQuestion}
+              confirmLabel="Yes, leave"
+              onConfirm={leave}
+            />
           </p>
         )
         : (
