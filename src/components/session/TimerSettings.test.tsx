@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
+import { DEFAULT_TIMERS } from '../../api/sessions'
 import { makeSession } from '../../test/fixtures'
 import TimerSettings from './TimerSettings'
 
@@ -22,7 +23,7 @@ describe('TimerSettings', () => {
 
     await userEvent.tab()
     expect(onSave).toHaveBeenCalledWith({ buzzerMs: 8000 })
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save/i })).not.toBeInTheDocument()
   })
 
   test('saves on Enter too', async () => {
@@ -52,5 +53,31 @@ describe('TimerSettings', () => {
     await userEvent.click(screen.getByLabelText('Clue reveal'))
     await userEvent.tab()
     expect(onSave).not.toHaveBeenCalled()
+  })
+})
+
+describe('TimerSettings reset', () => {
+  test('has a reset next to every timer, enabled only when it differs from the default', async () => {
+    const onSave = vi.fn()
+    render(
+      <TimerSettings
+        timers={{ ...DEFAULT_TIMERS, buzzerMs: 8000 }}
+        canEdit
+        onSave={onSave}
+      />,
+    )
+
+    const resets = screen.getAllByRole('button', { name: /^Reset / })
+    expect(resets).toHaveLength(9)
+    expect(resets.filter(button => !(button as HTMLButtonElement).disabled))
+      .toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Reset Answer to the default, 5s' }))
+      .toBeDisabled()
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Reset Buzzer to the default, 10s' }),
+    )
+
+    expect(onSave).toHaveBeenCalledWith({ buzzerMs: 10000 })
   })
 })

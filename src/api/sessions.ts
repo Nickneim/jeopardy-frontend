@@ -64,6 +64,19 @@ export interface SessionTimers {
 export const MIN_TIMER_MS = 1000
 export const MAX_TIMER_MS = 300000
 
+// Every session starts with these (api.md §6.3).
+export const DEFAULT_TIMERS: SessionTimers = {
+  clueChoiceMs: 30000,
+  clueRevealMs: 3000,
+  dailyDoubleWagerMs: 30000,
+  buzzerMs: 10000,
+  answerMs: 5000,
+  answerRevealMs: 3000,
+  finalJeopardyWagerMs: 30000,
+  finalJeopardyAnswerMs: 30000,
+  finalJeopardyRevealMs: 10000,
+}
+
 export type ClueSlotStatus = 'AVAILABLE' | 'PLAYED' | 'EMPTY'
 
 export interface ClueSlot {

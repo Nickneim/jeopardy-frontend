@@ -1,4 +1,6 @@
+import { useId } from 'react'
 import {
+  DEFAULT_TIMERS,
   MAX_TIMER_MS,
   MIN_TIMER_MS,
   type SessionTimers,
@@ -29,6 +31,8 @@ function TimerSettings({
   canEdit,
   onSave,
 }: TimerSettingsProps) {
+  const idPrefix = useId()
+
   // Saves one field when the host leaves it, kept within the backend's
   // bounds. An empty or unreadable value goes back to the saved one.
   function saveField(field: keyof SessionTimers, input: HTMLInputElement) {
@@ -77,25 +81,42 @@ function TimerSettings({
 
       <div className="timer-fields">
         {TIMER_FIELDS.map(field => (
-          <label key={field}>
-            {TIMER_LABELS[field]}
-            {/* Remounts when the saved value changes, to show it. */}
-            <input
-              key={timers[field]}
-              type="number"
-              name={field}
-              min={MIN_TIMER_MS / 1000}
-              max={MAX_TIMER_MS / 1000}
-              step="any"
-              defaultValue={timers[field] / 1000}
-              onBlur={event => saveField(field, event.currentTarget)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') {
-                  event.currentTarget.blur()
-                }
-              }}
-            />
-          </label>
+          <div key={field} className="timer-field">
+            <label htmlFor={`${idPrefix}-${field}`}>
+              {TIMER_LABELS[field]}
+            </label>
+
+            <div className="timer-input">
+              {/* Remounts when the saved value changes, to show it. */}
+              <input
+                key={timers[field]}
+                id={`${idPrefix}-${field}`}
+                type="number"
+                name={field}
+                min={MIN_TIMER_MS / 1000}
+                max={MAX_TIMER_MS / 1000}
+                step="any"
+                defaultValue={timers[field] / 1000}
+                onBlur={event => saveField(field, event.currentTarget)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur()
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                className="timer-reset"
+                aria-label={`Reset ${TIMER_LABELS[field]} to the default, ${DEFAULT_TIMERS[field] / 1000}s`}
+                title={`Reset to the default (${DEFAULT_TIMERS[field] / 1000}s)`}
+                disabled={timers[field] === DEFAULT_TIMERS[field]}
+                onClick={() => onSave({ [field]: DEFAULT_TIMERS[field] })}
+              >
+                <span aria-hidden="true">↺</span>
+              </button>
+            </div>
+          </div>
         ))}
       </div>
     </section>

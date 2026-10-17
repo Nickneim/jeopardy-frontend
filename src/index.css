@@ -482,14 +482,30 @@ p {
   margin-bottom: 12px;
 }
 
-.timer-fields label {
+.timer-field {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   font-size: 0.8rem;
 }
 
+.timer-input {
+  display: flex;
+  gap: 4px;
+}
+
 .timer-fields input {
-  width: 8em;
+  width: 6em;
+}
+
+.timer-reset {
+  padding: 0 6px;
+  line-height: 1;
+}
+
+.timer-reset:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .lobby {
