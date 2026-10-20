@@ -173,6 +173,25 @@ try {
 
   // Kick.
   // A shared link: choose, watch first, then join.
+  // The code shown in the lobby, typed on the live games page.
+  const code = sessionUrl.split('/').pop()
+  check('lobby shows the game code', (await alice.text()).includes(code))
+  await carol.goto(`${APP}/sessions`)
+  await carol.waitText('Join with a code')
+  await carol.eval(`document.querySelector('input[name=code]').value = 'ZZZZZ'`)
+  await carol.click('Join with a code')
+  check('an unknown code is explained on the form',
+    await carol.waitText('no live game with the code ZZZZZ'))
+  await carol.eval(`document.querySelector('input[name=code]').value = ${JSON.stringify(code.toLowerCase())}`)
+  await carol.click('Join with a code')
+  check('a code typed in lowercase opens the session',
+    await carol.waitText('Join this game') &&
+    (await carol.eval('location.href')) === sessionUrl)
+  await carol.goto(sessionUrl.replace(code, code.toLowerCase()))
+  check('a lowercase session URL redirects to the uppercase code',
+    await carol.waitText('Join this game') &&
+    (await carol.eval('location.href')) === sessionUrl)
+
   await carol.goto(sessionUrl)
   check('shared link offers Join / Watch', await carol.waitText('Watch as spectator') &&
     (await carol.text()).includes('Join this game') &&

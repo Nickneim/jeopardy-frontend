@@ -7,7 +7,7 @@ import { get, post, put } from './client'
 import type { ClueType } from './clues'
 import { ApiError } from './errors'
 import type { PageResponse } from './games'
-import { randomUuid } from '../uuid'
+import { normalizeSessionCode, randomSessionCode } from '../sessionCode'
 
 export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
 
@@ -207,11 +207,28 @@ function routedTo(id: string) {
   return { session: id }
 }
 
-// The client picks the new session's id, so the create can already be
-// routed by it.
-export function createSession(gameId: number): Promise<{ id: string }> {
-  const id = randomUuid()
-  return put<{ id: string }>(`/game-sessions/${id}`, { gameId }, routedTo(id))
+const CREATE_ATTEMPTS = 5
+
+// The client picks the new session's code, so the create can already be
+// routed by it. A 409 means another session has that code: pick another.
+export async function createSession(gameId: number): Promise<{ id: string }> {
+  for (let attempt = 1; ; attempt++) {
+    const id = randomSessionCode()
+
+    try {
+      return await put<{ id: string }>(
+        `/game-sessions/${id}`,
+        { gameId },
+        routedTo(id),
+      )
+    } catch (error) {
+      const taken = error instanceof ApiError && error.status === 409
+
+      if (!taken || attempt === CREATE_ATTEMPTS) {
+        throw error
+      }
+    }
+  }
 }
 
 export function getSessions(
@@ -381,23 +398,30 @@ export interface SessionLoaderData {
   player: JoinedPlayer | null
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// The session code in the URL, normalized the way the backend reads it, so
+// it's routed, stored and shown the same however it was typed.
+function sessionCodeParam(id: string | undefined): string {
+  const code = normalizeSessionCode(id ?? '')
 
-function sessionIdParam(id: string | undefined): string {
-  if (!id || !UUID_PATTERN.test(id)) {
-    throw new Response('Invalid session ID', {
+  if (!code) {
+    throw new Response('Invalid session code', {
       status: 400,
     })
   }
 
-  return id
+  return code
 }
 
 export async function sessionLoader({
   params,
+  request,
 }: LoaderFunctionArgs): Promise<SessionLoaderData> {
-  const id = sessionIdParam(params.id)
+  const id = sessionCodeParam(params.id)
+
+  // A typed URL such as /sessions/7kq2m goes to /sessions/7KQ2M.
+  if (id !== params.id) {
+    throw redirect(`/sessions/${id}${new URL(request.url).search}`)
+  }
 
   return {
     session: await getSession(id),
@@ -411,7 +435,7 @@ export interface JoinActionData {
 
 // Hosting is creating a session and joining it as its first player, who
 // becomes the host.
-export async function createSessionAction({
+async function createSessionAction({
   request,
 }: ActionFunctionArgs): Promise<JoinActionData | Response> {
   const formData = await request.formData()
@@ -433,11 +457,48 @@ export async function createSessionAction({
   return await joinAsPlayer(id, playerName) ?? redirect(`/sessions/${id}`)
 }
 
+// The live games list's route takes two forms: hosting, from a game page,
+// and "Join with a code".
+export async function sessionsAction(
+  args: ActionFunctionArgs,
+): Promise<JoinActionData | Response> {
+  const formData = await args.request.clone().formData()
+
+  return formData.has('code')
+    ? openByCode(String(formData.get('code')))
+    : createSessionAction(args)
+}
+
+// Opens the session with a typed code, or says on the form why it can't.
+async function openByCode(typed: string): Promise<JoinActionData | Response> {
+  if (!typed.trim()) {
+    return { error: "Enter the game's code." }
+  }
+
+  const code = normalizeSessionCode(typed)
+
+  if (!code) {
+    return { error: 'A game code is 5 letters and digits, such as 7KQ2M.' }
+  }
+
+  try {
+    await getSession(code)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return { error: `There's no live game with the code ${code}.` }
+    }
+
+    throw error
+  }
+
+  return redirect(`/sessions/${code}`)
+}
+
 export async function joinSessionAction({
   params,
   request,
 }: ActionFunctionArgs): Promise<JoinActionData | Response> {
-  const id = sessionIdParam(params.id)
+  const id = sessionCodeParam(params.id)
   const formData = await request.formData()
   const playerName = String(formData.get('playerName') ?? '').trim()
 

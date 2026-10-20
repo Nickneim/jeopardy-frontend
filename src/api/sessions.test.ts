@@ -1,21 +1,24 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { makeSession, SESSION_ID } from '../test/fixtures'
-import { randomUuid } from '../uuid'
+import { randomSessionCode } from '../sessionCode'
 import { get, post, put } from './client'
 import { ApiError } from './errors'
 import {
   clueAnswersRound,
-  createSessionAction,
   getRememberedPlayerName,
   getStoredPlayer,
   joinSessionAction,
   sessionLoader,
+  sessionsAction,
   sessionsLoader,
 } from './sessions'
 
 vi.mock('./client', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
-vi.mock('../uuid', () => ({ randomUuid: vi.fn() }))
+vi.mock('../sessionCode', async importOriginal => ({
+  ...await importOriginal<typeof import('../sessionCode')>(),
+  randomSessionCode: vi.fn(),
+}))
 
 // Loaders and actions only use `request` and `params`.
 function args(
@@ -51,7 +54,7 @@ beforeEach(() => {
   vi.mocked(get).mockReset()
   vi.mocked(post).mockReset()
   vi.mocked(put).mockReset()
-  vi.mocked(randomUuid).mockReset().mockReturnValue(SESSION_ID)
+  vi.mocked(randomSessionCode).mockReset().mockReturnValue(SESSION_ID)
 })
 
 describe('sessionsLoader', () => {
@@ -97,12 +100,25 @@ describe('sessionsLoader', () => {
 })
 
 describe('sessionLoader', () => {
-  test('rejects an id that is not a UUID with a 400', async () => {
-    const response = await thrown(
-      sessionLoader(args('http://localhost/sessions/123', { id: '123' })),
-    )
+  test.each(['123', '7KQ2U', '7KQ2MX'])(
+    'rejects %j, which is not a session code, with a 400',
+    async id => {
+      const response = await thrown(
+        sessionLoader(args(`http://localhost/sessions/${id}`, { id })),
+      )
 
-    expect(response.status).toBe(400)
+      expect(response.status).toBe(400)
+      expect(get).not.toHaveBeenCalled()
+    },
+  )
+
+  test('redirects a code typed another way to its normalized form', async () => {
+    const response = await thrown(sessionLoader(
+      args('http://localhost/sessions/7kq2m?x=1', { id: '7kq2m' }),
+    ))
+
+    expect(response.headers.get('Location')).toBe(`/sessions/${SESSION_ID}?x=1`)
+    expect(get).not.toHaveBeenCalled()
   })
 
   test('returns the session and the player stored for it', async () => {
@@ -125,12 +141,12 @@ describe('sessionLoader', () => {
   })
 })
 
-describe('createSessionAction', () => {
-  test('creates the session under a new id, joins it as the host and redirects to it', async () => {
+describe('sessionsAction: hosting', () => {
+  test('creates the session under a new code, joins it as the host and redirects to it', async () => {
     vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
     vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
 
-    const response = await createSessionAction(
+    const response = await sessionsAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: ' Alice ' }),
     )
 
@@ -152,7 +168,7 @@ describe('createSessionAction', () => {
   })
 
   test('asks for a name without creating a session', async () => {
-    const result = await createSessionAction(
+    const result = await sessionsAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: ' ' }),
     )
 
@@ -164,7 +180,7 @@ describe('createSessionAction', () => {
     vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
     vi.mocked(post).mockRejectedValue(new ApiError(400, 'Name too long'))
 
-    const result = await createSessionAction(
+    const result = await sessionsAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
     )
 
@@ -172,13 +188,77 @@ describe('createSessionAction', () => {
     expect(getStoredPlayer(SESSION_ID)).toBeNull()
   })
 
+  test('picks another code when the first one is taken', async () => {
+    vi.mocked(randomSessionCode)
+      .mockReturnValueOnce('AAAAA')
+      .mockReturnValueOnce(SESSION_ID)
+    vi.mocked(put)
+      .mockRejectedValueOnce(new ApiError(409, 'Game session already exists: AAAAA'))
+      .mockResolvedValueOnce({ id: SESSION_ID })
+    vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
+
+    const response = await sessionsAction(
+      args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
+    )
+
+    expect(put).toHaveBeenNthCalledWith(
+      2,
+      `/game-sessions/${SESSION_ID}`,
+      { gameId: 735 },
+      { session: SESSION_ID },
+    )
+    expect((response as Response).headers.get('Location'))
+      .toBe(`/sessions/${SESSION_ID}`)
+  })
+
+  test('gives up after 5 taken codes', async () => {
+    vi.mocked(put).mockRejectedValue(new ApiError(409, 'Game session already exists'))
+
+    await expect(sessionsAction(
+      args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
+    )).rejects.toThrow('Game session already exists')
+    expect(put).toHaveBeenCalledTimes(5)
+  })
+
   test('rejects an invalid game id with a 400', async () => {
     const response = await thrown(
-      createSessionAction(args('http://localhost/sessions', {}, { gameId: 'x' })),
+      sessionsAction(args('http://localhost/sessions', {}, { gameId: 'x' })),
     )
 
     expect(response.status).toBe(400)
     expect(put).not.toHaveBeenCalled()
+  })
+})
+
+describe('sessionsAction: join with a code', () => {
+  const url = 'http://localhost/sessions'
+
+  test('opens the session under the normalized code', async () => {
+    vi.mocked(get).mockResolvedValue(makeSession())
+
+    const response = await sessionsAction(args(url, {}, { code: ' 7kq2m ' }))
+
+    expect(get).toHaveBeenCalledWith(
+      `/game-sessions/${SESSION_ID}`,
+      { session: SESSION_ID },
+    )
+    expect((response as Response).headers.get('Location'))
+      .toBe(`/sessions/${SESSION_ID}`)
+  })
+
+  test.each([
+    ['', "Enter the game's code."],
+    ['7KQ', 'A game code is 5 letters and digits, such as 7KQ2M.'],
+  ])('explains on the form what is wrong with %j', async (code, error) => {
+    expect(await sessionsAction(args(url, {}, { code }))).toEqual({ error })
+    expect(get).not.toHaveBeenCalled()
+  })
+
+  test('says when no game has the code', async () => {
+    vi.mocked(get).mockRejectedValue(new ApiError(404, 'Game session not found'))
+
+    expect(await sessionsAction(args(url, {}, { code: '7KQ2M' })))
+      .toEqual({ error: "There's no live game with the code 7KQ2M." })
   })
 })
 

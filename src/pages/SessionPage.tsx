@@ -206,6 +206,7 @@ function LiveSession({
 
       {session.state === 'WAITING_FOR_START' && (
         <Lobby
+          code={session.id}
           isHost={isHost}
           hostName={hostName}
           timers={session.timers}

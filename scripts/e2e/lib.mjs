@@ -1,6 +1,6 @@
 // Shared helpers for the end-to-end scripts. They run against the real
 // backend through the Vite dev server, the same way the app does.
-import { randomUUID } from 'node:crypto'
+import { randomInt } from 'node:crypto'
 
 export const APP = process.env.APP_URL ?? 'http://localhost:5173'
 
@@ -36,9 +36,15 @@ export function sessionPath(id, rest = '') {
   return `/game-sessions/${id}${rest}?session=${encodeURIComponent(id)}`
 }
 
-// Creates a session the way the "Host live game" action does: under an id
+// A random session code, like src/sessionCode.ts makes.
+export function randomSessionCode() {
+  const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+  return Array.from({ length: 5 }, () => alphabet[randomInt(alphabet.length)]).join('')
+}
+
+// Creates a session the way the "Host live game" action does: under a code
 // the client picks, with only { gameId }.
-export function createSession(gameId, id = randomUUID()) {
+export function createSession(gameId, id = randomSessionCode()) {
   return api('PUT', sessionPath(id), { gameId })
 }
 

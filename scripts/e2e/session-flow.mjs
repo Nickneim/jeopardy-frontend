@@ -4,7 +4,6 @@
 //
 //   node scripts/e2e/session-flow.mjs     (GAME_ID=735 to pick the game)
 import { Client } from '@stomp/stompjs'
-import { randomUUID } from 'node:crypto'
 import {
   api,
   APP,
@@ -12,6 +11,7 @@ import {
   createSession,
   finish,
   preflight,
+  randomSessionCode,
   sessionPath,
   sleep,
 } from './lib.mjs'
@@ -67,12 +67,24 @@ async function waitFor(fn, ms = 3000) {
 }
 
 async function main() {
-  const id = randomUUID()
+  const id = randomSessionCode()
   const created = await createSession(GAME_ID, id)
-  check('create session under the id the client picked',
+  check('create session under the code the client picked',
     created.status === 201 && created.body.id === id, `status ${created.status}`)
   const again = await createSession(GAME_ID, id)
-  check('the same create sent twice → 409', again.status === 409, `status ${again.status}`)
+  check('a taken code → 409', again.status === 409, `status ${again.status}`)
+
+  // The backend reads a code in the path leniently: any case, O as 0, I and
+  // L as 1. The session parameter is the normalized code, as the app sends
+  // it, since load balancers route by its exact value.
+  const typed = id.toLowerCase().replace(/0/g, 'o').replace(/1/g, 'l')
+  const lenient = await api('GET', `/game-sessions/${typed}?session=${id}`)
+  check('a code typed in lowercase (O for 0, L for 1) finds the session',
+    lenient.status === 200 && lenient.body.id === id, `${typed} → ${lenient.status}`)
+  const invalid = await api('GET', sessionPath('7KQ2U'))
+  check('an invalid code → 400 with a message',
+    invalid.status === 400 && /Invalid session code/.test(invalid.body?.message),
+    JSON.stringify(invalid.body))
 
   let list = await api('GET', '/game-sessions')
   let entry = list.body.content.find(s => s.id === id)

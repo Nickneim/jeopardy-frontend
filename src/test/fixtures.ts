@@ -1,6 +1,6 @@
 import type { GameSession, Player } from '../api/sessions'
 
-export const SESSION_ID = '8f6c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b'
+export const SESSION_ID = '7KQ2M'
 
 export function makePlayer(overrides: Partial<Player> = {}): Player {
   return {

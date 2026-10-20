@@ -15,9 +15,9 @@ import {
 } from './api/games'
 import { clueLoader } from './api/clues'
 import {
-  createSessionAction,
   joinSessionAction,
   sessionLoader,
+  sessionsAction,
   sessionsLoader,
 } from './api/sessions'
 
@@ -50,7 +50,7 @@ const router = createBrowserRouter([
         path: 'sessions',
         element: <SessionsPage />,
         loader: sessionsLoader,
-        action: createSessionAction,
+        action: sessionsAction,
       },
       {
         path: 'sessions/:id',

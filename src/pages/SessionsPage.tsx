@@ -7,6 +7,7 @@ import {
 } from 'react-router'
 import type { PageResponse } from '../api/games'
 import type { GameSessionSummary } from '../api/sessions'
+import JoinByCode from '../components/session/JoinByCode'
 import { formatMoney, ROUND_NAMES } from '../format'
 import type { SessionLinkState } from '../navigation'
 
@@ -67,6 +68,8 @@ function SessionsPage() {
           Refresh
         </button>
       </p>
+
+      <JoinByCode />
 
       <label className="checkbox-label">
         <input

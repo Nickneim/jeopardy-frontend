@@ -3,6 +3,8 @@ import type { SessionTimers } from '../../api/sessions'
 import TimerSettings from './TimerSettings'
 
 interface LobbyProps {
+  // The session code, for players to type on the live games page.
+  code: string
   isHost: boolean
   hostName: string | null
   timers: SessionTimers
@@ -13,6 +15,7 @@ interface LobbyProps {
 }
 
 function Lobby({
+  code,
   isHost,
   hostName,
   timers,
@@ -35,7 +38,9 @@ function Lobby({
   return (
     <section className="lobby">
       <p>
-        Invite players by sharing this page's link.{' '}
+        Invite players with the game code{' '}
+        <strong className="session-code">{code}</strong>{' '}
+        or this page's link.{' '}
         <button type="button" onClick={copyLink}>
           {copied ? 'Link copied' : 'Copy link'}
         </button>
