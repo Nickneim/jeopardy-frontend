@@ -8,6 +8,7 @@ import { useGameSession } from './useGameSession'
 // A stand-in for @stomp/stompjs's Client: tests drive its callbacks.
 interface FakeClient {
   config: {
+    brokerURL: string
     connectHeaders: Record<string, string>
     onConnect: () => void
     onStompError: (frame: { headers: Record<string, string> }) => void
@@ -88,6 +89,12 @@ describe('useGameSession', () => {
 
     renderHook(() => useGameSession(makeSession(), null, () => {}))
     expect(lastClient().config.connectHeaders).toEqual({})
+  })
+
+  test('connects to /ws with the session in the URL, for routing', () => {
+    renderHook(() => useGameSession(makeSession(), null, () => {}))
+    expect(lastClient().config.brokerURL)
+      .toBe(`ws://${window.location.host}/ws?session=${SESSION_ID}`)
   })
 
   test('keeps the snapshot with the highest version', () => {

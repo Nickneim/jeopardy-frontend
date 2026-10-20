@@ -4,16 +4,21 @@
 //
 //   node scripts/e2e/session-flow.mjs     (GAME_ID=735 to pick the game)
 import { Client } from '@stomp/stompjs'
+import { randomUUID } from 'node:crypto'
 import {
   api,
   APP,
   check,
+  createSession,
   finish,
   preflight,
+  sessionPath,
   sleep,
 } from './lib.mjs'
 
-const WS = `${APP.replace(/^http/, 'ws')}/ws`
+// One connection per session: the session in the URL routes it.
+const wsUrl = sessionId =>
+  `${APP.replace(/^http/, 'ws')}/ws?session=${encodeURIComponent(sessionId)}`
 const GAME_ID = await preflight()
 
 // A STOMP connection like useGameSession's: records snapshots, errors and
@@ -25,7 +30,7 @@ function connect(sessionId, token) {
       (a, b) => (!a || b.version > a.version ? b : a), null),
   }
   const client = new Client({
-    brokerURL: WS,
+    brokerURL: wsUrl(sessionId),
     connectHeaders: token ? { 'player-token': token } : {},
     reconnectDelay: 0,
     onConnect: () => {
@@ -62,10 +67,12 @@ async function waitFor(fn, ms = 3000) {
 }
 
 async function main() {
-  // Create, as the "Host live game" action does: only { gameId }.
-  const created = await api('POST', '/game-sessions', { gameId: GAME_ID })
-  check('create session', created.status === 201, `status ${created.status}`)
-  const id = created.body.id
+  const id = randomUUID()
+  const created = await createSession(GAME_ID, id)
+  check('create session under the id the client picked',
+    created.status === 201 && created.body.id === id, `status ${created.status}`)
+  const again = await createSession(GAME_ID, id)
+  check('the same create sent twice → 409', again.status === 409, `status ${again.status}`)
 
   let list = await api('GET', '/game-sessions')
   let entry = list.body.content.find(s => s.id === id)
@@ -74,10 +81,10 @@ async function main() {
     entry.playerCount === 0 && entry.allowLateJoin === true && entry.joinScore === 0,
     JSON.stringify(entry))
 
-  const alice = (await api('POST', `/game-sessions/${id}/players`, { playerName: 'Alice' })).body
-  const bob = (await api('POST', `/game-sessions/${id}/players`, { playerName: 'Bob' })).body
+  const alice = (await api('POST', sessionPath(id, '/players'), { playerName: 'Alice' })).body
+  const bob = (await api('POST', sessionPath(id, '/players'), { playerName: 'Bob' })).body
 
-  let state = (await api('GET', `/game-sessions/${id}`)).body
+  let state = (await api('GET', sessionPath(id))).body
   check('first joiner is host', state.hostPlayerId === alice.playerId)
   check('snapshot has timers, allowLateJoin, joinScore, leaving',
     typeof state.timers?.buzzerMs === 'number' && state.allowLateJoin === true &&
@@ -110,7 +117,7 @@ async function main() {
     a.errors[0]?.message)
 
   // Kick, in the lobby.
-  const carol = (await api('POST', `/game-sessions/${id}/players`, { playerName: 'Carol' })).body
+  const carol = (await api('POST', sessionPath(id, '/players'), { playerName: 'Carol' })).body
   const c = connect(id, carol.token)
   await waitFor(() => c.connected)
   a.send('kick', { playerId: carol.playerId })
@@ -136,7 +143,7 @@ async function main() {
   await waitFor(() => watcher.latest()?.state === 'CHOOSING_CLUE')
   check('host starts game', watcher.latest()?.state === 'CHOOSING_CLUE')
 
-  const late = await api('POST', `/game-sessions/${id}/players`, { playerName: 'Dave' })
+  const late = await api('POST', sessionPath(id, '/players'), { playerName: 'Dave' })
   check('late join refused with 409 + message',
     late.status === 409 && !!late.body?.message, JSON.stringify(late.body))
 
@@ -168,15 +175,15 @@ async function main() {
     last?.state === 'CLOSED' && last?.closeReason === 'ABANDONED',
     JSON.stringify({ state: last?.state, closeReason: last?.closeReason }))
 
-  const gone = await api('GET', `/game-sessions/${id}`)
+  const gone = await api('GET', sessionPath(id))
   check('closed session GET → 404', gone.status === 404)
 
   for (const conn of [watcher, a, b, c, c2]) void conn.client.deactivate()
 
   // Second session: the leaving chooser, and the host handover.
-  const s2 = (await api('POST', '/game-sessions', { gameId: GAME_ID })).body.id
-  const p1 = (await api('POST', `/game-sessions/${s2}/players`, { playerName: 'P1' })).body
-  const p2 = (await api('POST', `/game-sessions/${s2}/players`, { playerName: 'P2' })).body
+  const s2 = (await createSession(GAME_ID)).body.id
+  const p1 = (await api('POST', sessionPath(s2, '/players'), { playerName: 'P1' })).body
+  const p2 = (await api('POST', sessionPath(s2, '/players'), { playerName: 'P2' })).body
   const w2 = connect(s2, null)
   const c1 = connect(s2, p1.token)
   await waitFor(() => w2.connected && c1.connected)

@@ -38,6 +38,15 @@ export function get<T>(
 export function post<T>(
   url: string,
   body: unknown,
+  params?: Record<string, string | number | undefined>,
 ): Promise<T> {
-  return request(() => apiClient.post<T>(url, body))
+  return request(() => apiClient.post<T>(url, body, { params }))
+}
+
+export function put<T>(
+  url: string,
+  body: unknown,
+  params?: Record<string, string | number | undefined>,
+): Promise<T> {
+  return request(() => apiClient.put<T>(url, body, { params }))
 }

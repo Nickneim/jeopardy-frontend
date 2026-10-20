@@ -37,9 +37,11 @@ export interface SessionActions {
 
 const ERROR_VISIBLE_MS = 5000
 
-function brokerUrl(): string {
+// The session in the URL routes the connection to the backend instance that
+// holds it, so a connection is only ever used for that one session.
+function brokerUrl(sessionId: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${window.location.host}/ws`
+  return `${protocol}://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}`
 }
 
 /**
@@ -99,7 +101,7 @@ export function useGameSession(
     let connected = false
 
     const client = new Client({
-      brokerURL: brokerUrl(),
+      brokerURL: brokerUrl(sessionId),
       connectHeaders: token ? { 'player-token': token } : {},
       reconnectDelay: 2000,
 

@@ -16,7 +16,7 @@ description: Run the end-to-end checks for live game sessions against the real b
 
 ## Steps
 
-1. **Backend.** `curl -s -m 3 http://localhost:8080/api/game-sessions` must answer. If it doesn't, ask the user to start it from `../backend`. Don't start it yourself, because it needs their database environment variables.
+1. **Backend.** `curl -s -m 3 http://localhost:8080/api/game-sessions` must answer (or, when the dev server runs with `BACKEND_URL`, that address instead, e.g. `http://localhost` for the Kubernetes Ingress). If it doesn't, ask the user to start it from `../backend`. Don't start it yourself, because it needs their database environment variables.
 2. **Dev server.** If `http://localhost:5173` doesn't answer, start `npm run dev` in the background. Stop it at the end only if you started it.
 3. **Run** `npm run e2e`, or one script with `node scripts/e2e/<script>`. To save tokens, filter the output to what matters: `npm run e2e 2>&1 | grep -E "^FAIL|checks? (passed|failed)|Screenshots"`. Show the full output only when something fails.
 4. **Screenshots.** `ui-flow.mjs` saves PNGs (host and player lobby, the closed view, the join choice, joining mid-game) to the folder it prints at the end. Look at them when the change is visual.

@@ -3,10 +3,11 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router'
-import { get, post } from './client'
+import { get, post, put } from './client'
 import type { ClueType } from './clues'
 import { ApiError } from './errors'
 import type { PageResponse } from './games'
+import { randomUuid } from '../uuid'
 
 export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
 
@@ -199,8 +200,18 @@ export interface JoinedPlayer {
   token: string
 }
 
+// Every request about one session carries ?session=<its id>. With several
+// backend instances, the load balancer routes by it to the instance that
+// holds the session; a single instance ignores it.
+function routedTo(id: string) {
+  return { session: id }
+}
+
+// The client picks the new session's id, so the create can already be
+// routed by it.
 export function createSession(gameId: number): Promise<{ id: string }> {
-  return post<{ id: string }>('/game-sessions', { gameId })
+  const id = randomUuid()
+  return put<{ id: string }>(`/game-sessions/${id}`, { gameId }, routedTo(id))
 }
 
 export function getSessions(
@@ -217,14 +228,18 @@ export function getSessions(
 }
 
 export function getSession(id: string): Promise<GameSession> {
-  return get<GameSession>(`/game-sessions/${id}`)
+  return get<GameSession>(`/game-sessions/${id}`, routedTo(id))
 }
 
 export function joinSession(
   id: string,
   playerName: string,
 ): Promise<JoinedPlayer> {
-  return post<JoinedPlayer>(`/game-sessions/${id}/players`, { playerName })
+  return post<JoinedPlayer>(
+    `/game-sessions/${id}/players`,
+    { playerName },
+    routedTo(id),
+  )
 }
 
 // The token is a secret that proves who the player is. It's kept so a

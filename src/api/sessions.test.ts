@@ -1,7 +1,8 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { makeSession, SESSION_ID } from '../test/fixtures'
-import { get, post } from './client'
+import { randomUuid } from '../uuid'
+import { get, post, put } from './client'
 import { ApiError } from './errors'
 import {
   clueAnswersRound,
@@ -13,7 +14,8 @@ import {
   sessionsLoader,
 } from './sessions'
 
-vi.mock('./client', () => ({ get: vi.fn(), post: vi.fn() }))
+vi.mock('./client', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
+vi.mock('../uuid', () => ({ randomUuid: vi.fn() }))
 
 // Loaders and actions only use `request` and `params`.
 function args(
@@ -48,6 +50,8 @@ function page(totalPages: number, pageNumber = 0) {
 beforeEach(() => {
   vi.mocked(get).mockReset()
   vi.mocked(post).mockReset()
+  vi.mocked(put).mockReset()
+  vi.mocked(randomUuid).mockReset().mockReturnValue(SESSION_ID)
 })
 
 describe('sessionsLoader', () => {
@@ -113,25 +117,33 @@ describe('sessionLoader', () => {
       args(`http://localhost/sessions/${SESSION_ID}`, { id: SESSION_ID }),
     )
 
+    expect(get).toHaveBeenCalledWith(
+      `/game-sessions/${SESSION_ID}`,
+      { session: SESSION_ID },
+    )
     expect(data).toEqual({ session, player: { playerId: 2, token: 'secret' } })
   })
 })
 
 describe('createSessionAction', () => {
-  test('creates the session, joins it as the host and redirects to it', async () => {
-    vi.mocked(post)
-      .mockResolvedValueOnce({ id: SESSION_ID })
-      .mockResolvedValueOnce({ playerId: 1, token: 'secret' })
+  test('creates the session under a new id, joins it as the host and redirects to it', async () => {
+    vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
+    vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
 
     const response = await createSessionAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: ' Alice ' }),
     )
 
-    expect(post).toHaveBeenNthCalledWith(1, '/game-sessions', { gameId: 735 })
-    expect(post).toHaveBeenNthCalledWith(
-      2,
+    // Both requests carry the session id for the load balancer to route by.
+    expect(put).toHaveBeenCalledWith(
+      `/game-sessions/${SESSION_ID}`,
+      { gameId: 735 },
+      { session: SESSION_ID },
+    )
+    expect(post).toHaveBeenCalledWith(
       `/game-sessions/${SESSION_ID}/players`,
       { playerName: 'Alice' },
+      { session: SESSION_ID },
     )
     expect(getStoredPlayer(SESSION_ID)).toEqual({ playerId: 1, token: 'secret' })
     expect(getRememberedPlayerName()).toBe('Alice')
@@ -145,13 +157,12 @@ describe('createSessionAction', () => {
     )
 
     expect(result).toEqual({ error: 'Enter your name to host.' })
-    expect(post).not.toHaveBeenCalled()
+    expect(put).not.toHaveBeenCalled()
   })
 
   test('shows a name the backend rejects on the form', async () => {
-    vi.mocked(post)
-      .mockResolvedValueOnce({ id: SESSION_ID })
-      .mockRejectedValueOnce(new ApiError(400, 'Name too long'))
+    vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
+    vi.mocked(post).mockRejectedValue(new ApiError(400, 'Name too long'))
 
     const result = await createSessionAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
@@ -167,7 +178,7 @@ describe('createSessionAction', () => {
     )
 
     expect(response.status).toBe(400)
-    expect(post).not.toHaveBeenCalled()
+    expect(put).not.toHaveBeenCalled()
   })
 })
 
@@ -185,6 +196,7 @@ describe('joinSessionAction', () => {
     expect(post).toHaveBeenCalledWith(
       `/game-sessions/${SESSION_ID}/players`,
       { playerName: 'Bob' },
+      { session: SESSION_ID },
     )
     expect(getStoredPlayer(SESSION_ID)).toEqual({ playerId: 3, token: 'secret' })
     expect((response as Response).headers.get('Location'))
