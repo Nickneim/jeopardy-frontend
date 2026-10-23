@@ -24,6 +24,7 @@ import Countdown from '../components/session/Countdown'
 import FinalJeopardyPanel from '../components/session/FinalJeopardyPanel'
 import GameResult from '../components/session/GameResult'
 import JoinChoice from '../components/session/JoinChoice'
+import ServerOffline from '../components/ServerOffline'
 import Lobby from '../components/session/Lobby'
 import Scoreboard from '../components/session/Scoreboard'
 import SessionBoard from '../components/session/SessionBoard'
@@ -86,6 +87,10 @@ function LiveSession({
       forgetPlayer(session.id)
     }
   }, [isClosed, session.id])
+
+  if (status === 'offline') {
+    return <ServerOffline />
+  }
 
   if (status === 'gone') {
     return (

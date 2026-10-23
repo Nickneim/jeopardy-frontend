@@ -6,13 +6,15 @@ import {
   type GameSessionError,
   type SessionTimers,
 } from '../api/sessions'
-import { ApiError } from '../api/errors'
+import { ApiError, isServerOffline } from '../api/errors'
 
 export type ConnectionStatus =
   | 'connecting'
   | 'connected'
   | 'reconnecting'
   | 'gone'
+  // Neither the WebSocket nor the REST API can be reached.
+  | 'offline'
 
 export interface SessionSnapshot {
   session: GameSession
@@ -57,6 +59,10 @@ function brokerUrl(sessionId: string): string {
  * `onTokenRejected` gets the server's reason when the player was connected
  * and then left or was kicked, and `null` when the token was rejected on
  * CONNECT (e.g. the session was lost in a backend restart).
+ *
+ * When the WebSocket can't connect, the hook asks the REST API for the
+ * session: if that can't be reached either, the server is switched off, so
+ * it stops reconnecting and reports `offline`.
  */
 export function useGameSession(
   initial: GameSession,
@@ -99,6 +105,40 @@ export function useGameSession(
 
   useEffect(() => {
     let connected = false
+    // Set once the client is shut down here, so it isn't checked on anymore.
+    let stopped = false
+    let checkingServer = false
+
+    function stop() {
+      stopped = true
+      void client.deactivate()
+    }
+
+    // The WebSocket failed to connect: tell a stopped server from a
+    // connection problem.
+    function checkServer() {
+      if (checkingServer) {
+        return
+      }
+
+      checkingServer = true
+      getSession(sessionId)
+        .then(accept)
+        .catch(fetchError => {
+          if (stopped) {
+            return
+          }
+
+          if (isServerOffline(fetchError)) {
+            stop()
+            setStatus('offline')
+          } else if (fetchError instanceof ApiError && fetchError.status === 404) {
+            stop()
+            setStatus('gone')
+          }
+        })
+        .finally(() => { checkingServer = false })
+    }
 
     const client = new Client({
       brokerURL: brokerUrl(sessionId),
@@ -125,7 +165,7 @@ export function useGameSession(
           .catch(fetchError => {
             if (fetchError instanceof ApiError && fetchError.status === 404) {
               setStatus('gone')
-              void client.deactivate()
+              stop()
             }
           })
       },
@@ -134,7 +174,7 @@ export function useGameSession(
       // rejects it on CONNECT, or closes the connection after a leave or kick.
       onStompError: frame => {
         if (token) {
-          void client.deactivate()
+          stop()
           onTokenRejectedRef.current(
             connected ? frame.headers.message ?? null : null,
           )
@@ -142,8 +182,18 @@ export function useGameSession(
       },
 
       onWebSocketClose: () => {
+        const wasConnected = connected
         connected = false
-        setStatus(current => current === 'gone' ? current : 'reconnecting')
+
+        if (stopped) {
+          return
+        }
+
+        setStatus('reconnecting')
+
+        if (!wasConnected) {
+          checkServer()
+        }
       },
     })
 
@@ -152,7 +202,7 @@ export function useGameSession(
 
     return () => {
       clientRef.current = null
-      void client.deactivate()
+      stop()
     }
   }, [sessionId, token])
 

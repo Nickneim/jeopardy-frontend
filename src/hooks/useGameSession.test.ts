@@ -138,6 +138,44 @@ describe('useGameSession', () => {
     expect(lastClient().deactivated).toBe(true)
   })
 
+  test('reports the server offline when neither the WebSocket nor the API answers', async () => {
+    vi.mocked(getSession).mockRejectedValue(new ApiError(504, 'Request failed'))
+
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), null, () => {}))
+
+    act(() => lastClient().config.onWebSocketClose())
+
+    await waitFor(() => expect(result.current.status).toBe('offline'))
+    expect(getSession).toHaveBeenCalledWith(SESSION_ID)
+    expect(lastClient().deactivated).toBe(true)
+  })
+
+  test('keeps reconnecting when the WebSocket fails but the API answers', async () => {
+    vi.mocked(getSession).mockRejectedValue(new ApiError(500, 'Oops'))
+
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), null, () => {}))
+
+    act(() => lastClient().config.onWebSocketClose())
+
+    await waitFor(() => expect(getSession).toHaveBeenCalled())
+    expect(result.current.status).toBe('reconnecting')
+    expect(lastClient().deactivated).toBe(false)
+  })
+
+  test('a dropped connection reconnects before checking on the server', () => {
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), null, () => {}))
+
+    connect()
+    vi.mocked(getSession).mockClear()
+    act(() => lastClient().config.onWebSocketClose())
+
+    expect(result.current.status).toBe('reconnecting')
+    expect(getSession).not.toHaveBeenCalled()
+  })
+
   test('a token rejected on CONNECT is reported without a reason', () => {
     const onTokenRejected = vi.fn()
     renderHook(() => useGameSession(makeSession(), 'secret', onTokenRejected))

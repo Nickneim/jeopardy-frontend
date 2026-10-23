@@ -7,6 +7,7 @@ import GamesPage from './pages/GamesPage'
 import GamePage from './pages/GamePage'
 import CluePage from './pages/CluePage'
 import ErrorPage from './pages/ErrorPage'
+import LoadingPage from './pages/LoadingPage'
 import SessionPage from './pages/SessionPage'
 import SessionsPage from './pages/SessionsPage'
 import {
@@ -26,6 +27,8 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     errorElement: <ErrorPage />,
+    // Until the first page's loader is done.
+    HydrateFallback: LoadingPage,
     children: [
       {
         index: true,

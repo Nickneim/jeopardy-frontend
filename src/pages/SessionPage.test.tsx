@@ -8,7 +8,10 @@ import SessionPage from './SessionPage'
 // Replace the live connection: the test calls onTokenRejected itself, the
 // way the hook does when the server rejects or closes the connection.
 const { hook } = vi.hoisted(() => ({
-  hook: {} as { onTokenRejected?: (reason: string | null) => void },
+  hook: {} as {
+    onTokenRejected?: (reason: string | null) => void
+    status?: string
+  },
 }))
 
 vi.mock('../hooks/useGameSession', () => ({
@@ -21,7 +24,7 @@ vi.mock('../hooks/useGameSession', () => ({
     return {
       session: initial,
       receivedAt: 0,
-      status: 'connected',
+      status: hook.status ?? 'connected',
       error: null,
       actions: {},
     }
@@ -45,6 +48,7 @@ function renderSessionPage() {
 }
 
 beforeEach(() => {
+  hook.status = undefined
   localStorage.setItem(
     `jeopardy.session.${SESSION_ID}`,
     JSON.stringify({ playerId: 2, token: 'secret' }),
@@ -75,5 +79,15 @@ describe('SessionPage', () => {
     await act(async () => hook.onTokenRejected?.(null))
 
     expect(screen.getByText('You left the game.')).toBeInTheDocument()
+  })
+
+  test('shows the offline message when the server is unreachable', async () => {
+    hook.status = 'offline'
+    renderSessionPage()
+
+    expect(await screen.findByText(/The game server is offline right now/))
+      .toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
+    expect(screen.queryByText(/Playing as/)).not.toBeInTheDocument()
   })
 })

@@ -3,10 +3,15 @@ import {
   Link,
   useRouteError,
 } from 'react-router'
-import { ApiError } from '../api/errors'
+import { ApiError, isServerOffline } from '../api/errors'
+import ServerOffline from '../components/ServerOffline'
 
 function ErrorPage() {
   const error = useRouteError()
+
+  if (isServerOffline(error)) {
+    return <ServerOffline />
+  }
 
   let message = 'An unexpected error occurred.'
   let status: number | undefined
