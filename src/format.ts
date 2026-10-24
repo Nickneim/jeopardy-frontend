@@ -1,4 +1,4 @@
-import type { GameRound } from './api/sessions'
+import type { AcceptedAnswers, GameRound } from './api/sessions'
 
 export function formatMoney(value: number): string {
   const sign = value < 0 ? '-' : ''
@@ -14,7 +14,8 @@ export const ROUND_NAMES: Record<GameRound, string> = {
 const ANSWER_LIST = /^\s*\((\d+) of\)\s*(.*)$/s
 
 // Correct responses write alternatives and lists as "(N of) A | B | C"
-// (api.md §6.7). Shows them as "A or B", "A, B and C" or "Any 2 of: A, B, C".
+// (api.md §6.7). For the browsing pages, whose clues come without
+// acceptedAnswers: live games show those instead.
 export function formatCorrectResponse(answer: string): string {
   const list = ANSWER_LIST.exec(answer)
 
@@ -22,18 +23,34 @@ export function formatCorrectResponse(answer: string): string {
     return answer
   }
 
-  const needed = Number(list[1])
-  const options = list[2].split('|').map(option => option.trim())
+  return formatAcceptedAnswers({
+    required: Number(list[1]),
+    options: list[2].split('|').map(option => option.trim()),
+  })
+}
 
-  if (needed <= 1) {
+// A live clue's accepted answers (api.md §6.7): one option as it is, a list
+// as "A or B", "A, B and C" or "Any 2 of: A, B, C".
+export function formatAcceptedAnswers({ required, options }: AcceptedAnswers): string {
+  if (required <= 1) {
     return joinWords(options, 'or')
   }
 
-  if (needed >= options.length) {
+  if (required >= options.length) {
     return joinWords(options, 'and')
   }
 
-  return `Any ${needed} of: ${options.join(', ')}`
+  return `Any ${required} of: ${options.join(', ')}`
+}
+
+// What a correct answer named (matchedAnswers): "myrrh and gold".
+export function formatMatchedAnswers(matched: string[]): string {
+  return joinWords(matched, 'and')
+}
+
+// A list's options the player didn't name (alsoAccepted): "Uruguay or Argentina".
+export function formatAlsoAccepted(alsoAccepted: string[]): string {
+  return joinWords(alsoAccepted, 'or')
 }
 
 function joinWords(words: string[], conjunction: string): string {

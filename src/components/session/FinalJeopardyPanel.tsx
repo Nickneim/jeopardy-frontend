@@ -7,8 +7,9 @@ import {
   type SentFinalJeopardy,
 } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
-import { formatCorrectResponse, formatMoney } from '../../format'
+import { formatMoney } from '../../format'
 import AnswerForm from './AnswerForm'
+import CorrectResponse from './CorrectResponse'
 import FinalReveal from './FinalReveal'
 import type { FinalRevealProgress } from './revealProgress'
 import WagerForm from './WagerForm'
@@ -44,6 +45,12 @@ function FinalJeopardyPanel({
 
   const isWagering = session.state === 'FINAL_JEOPARDY_WAGERING'
   const isRevealing = session.state === 'FINAL_JEOPARDY_REVEALING'
+
+  // The correct response in the wording you used if you got it right,
+  // otherwise in the first right answer's.
+  const correct = final.players.filter(player => player.correct)
+  const correctMatch = correct.find(player => player.playerId === me?.id) ??
+    correct[0]
 
   function remember(update: Partial<SentFinalJeopardy>) {
     const next = { ...sent, ...update }
@@ -131,11 +138,11 @@ function FinalJeopardyPanel({
         <>
           <FinalReveal players={session.players} reveal={reveal} final={final} />
 
-          {(reveal === null || reveal.showCorrectResponse) && final.answer && (
-            <p className="tv-correct-response">
-              <span className="tv-kicker">Correct response</span>
-              <strong>{formatCorrectResponse(final.answer)}</strong>
-            </p>
+          {(reveal === null || reveal.showCorrectResponse) && (
+            <CorrectResponse
+              accepted={final.acceptedAnswers}
+              match={correctMatch}
+            />
           )}
         </>
       )}

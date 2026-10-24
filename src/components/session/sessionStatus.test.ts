@@ -24,7 +24,7 @@ describe('sessionStatus', () => {
       state: 'WAITING_FOR_BUZZER',
       players: [alice, bob],
       playersLockedOut: [2],
-      clueAnswers: [{ playerId: 2, answer: 'Paris', correct: false, phrasedAsQuestion: false }],
+      clueAnswers: [{ playerId: 2, answer: 'Paris', correct: false, phrasedAsQuestion: false, matchedAnswers: null, alsoAccepted: null }],
     })
 
     expect(sessionStatus(session, alice).message).toBe('Still open · buzz in now')

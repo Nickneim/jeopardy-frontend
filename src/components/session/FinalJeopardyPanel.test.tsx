@@ -20,6 +20,7 @@ function finalJeopardy(state: GameSession['state']): GameSession {
       question: state === 'FINAL_JEOPARDY_ANSWERING' ? 'Its name means "good air"' : null,
       numberExpected: state === 'FINAL_JEOPARDY_WAGERING' ? null : false,
       answer: null,
+      acceptedAnswers: null,
       players: [{
         playerId: 1,
         hasWagered: false,
@@ -28,6 +29,8 @@ function finalJeopardy(state: GameSession['state']): GameSession {
         answer: null,
         correct: null,
         phrasedAsQuestion: null,
+        matchedAnswers: null,
+        alsoAccepted: null,
       }],
     },
   })
@@ -99,5 +102,44 @@ describe('FinalJeopardyPanel', () => {
     renderPanel(finalJeopardy('FINAL_JEOPARDY_WAGERING'))
 
     expect(screen.queryByText(/Your wager:/)).not.toBeInTheDocument()
+  })
+
+  test("shows the correct response in the player's own wording", () => {
+    const bob = makePlayer({ id: 2, name: 'Bob', score: 1000 })
+    const revealed = (playerId: number, answer: string, matched: string[] | null) => ({
+      playerId,
+      hasWagered: true,
+      hasAnswered: true,
+      wager: 0,
+      answer,
+      correct: matched !== null,
+      phrasedAsQuestion: true,
+      matchedAnswers: matched,
+      alsoAccepted: matched && [],
+    })
+    const session = makeSession({
+      state: 'FINAL_JEOPARDY_REVEALING',
+      round: 'FINAL_JEOPARDY',
+      players: [alice, bob],
+      finalJeopardy: {
+        category: 'COUNTRIES',
+        categoryComments: null,
+        question: 'Its capital is Yangon no more',
+        numberExpected: false,
+        answer: '[Myanmar | Burma]',
+        acceptedAnswers: { required: 1, options: ['Myanmar'] },
+        players: [
+          revealed(1, 'What is Myanmar?', ['Myanmar']),
+          revealed(2, 'What is Burma?', ['Burma']),
+        ],
+      },
+    })
+
+    const { unmount } = renderPanel(session, bob)
+    expect(screen.getByText('Burma', { selector: 'strong' })).toBeInTheDocument()
+
+    unmount()
+    renderPanel(session, alice)
+    expect(screen.getByText('Myanmar', { selector: 'strong' })).toBeInTheDocument()
   })
 })

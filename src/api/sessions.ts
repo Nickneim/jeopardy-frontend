@@ -103,8 +103,17 @@ export interface CurrentClue {
   mediaUrl: string | null
   // Only an exact number is accepted (api.md §6.7). Hidden like `question`.
   numberExpected: boolean | null
-  // "(N of) A | B" for alternatives: show it with formatCorrectResponse.
+  // Written as in api.md §6.7. Show acceptedAnswers instead.
   answer: string | null
+  // Revealed with `answer`, ready to show (formatAcceptedAnswers).
+  acceptedAnswers: AcceptedAnswers | null
+}
+
+// A correct response names `required` of the options, each in one wording.
+// Anything but a list has a single option.
+export interface AcceptedAnswers {
+  required: number
+  options: string[]
 }
 
 export interface ClueAnswer {
@@ -113,6 +122,10 @@ export interface ClueAnswer {
   correct: boolean
   // Set in every round, null when the player ran out of time (api.md §6.7).
   phrasedAsQuestion: boolean | null
+  // Correct answers only: what it named, in the wording the player matched.
+  matchedAnswers: string[] | null
+  // Correct answers only: a list's options it didn't name, [] if not a list.
+  alsoAccepted: string[] | null
 }
 
 export interface FinalJeopardyPlayer {
@@ -124,6 +137,9 @@ export interface FinalJeopardyPlayer {
   correct: boolean | null
   // Revealed with `correct`, null without an answer.
   phrasedAsQuestion: boolean | null
+  // Revealed, correct answers only (as in ClueAnswer).
+  matchedAnswers: string[] | null
+  alsoAccepted: string[] | null
 }
 
 export interface FinalJeopardy {
@@ -132,8 +148,10 @@ export interface FinalJeopardy {
   question: string | null
   // Only an exact number is accepted (api.md §6.7). Null while wagering.
   numberExpected: boolean | null
-  // "(N of) A | B" for alternatives: show it with formatCorrectResponse.
+  // Written as in api.md §6.7. Show acceptedAnswers instead.
   answer: string | null
+  // Revealed with `answer`, ready to show (formatAcceptedAnswers).
+  acceptedAnswers: AcceptedAnswers | null
   players: FinalJeopardyPlayer[]
 }
 

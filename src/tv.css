@@ -460,6 +460,11 @@
   text-shadow: 5px 5px 0 #000;
 }
 
+.tv-also-accepted {
+  font: italic 400 clamp(16px, 1.8vw, 22px) var(--tv-serif);
+  text-align: center;
+}
+
 /* The game board */
 
 .tv-board {

@@ -1,9 +1,10 @@
 import { clueAnswersRound, type GameSession, type Player } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
-import { formatCorrectResponse, formatMoney } from '../../format'
+import { formatMoney } from '../../format'
 import ClueMedia from '../ClueMedia'
 import AnswerForm from './AnswerForm'
 import ClueAnswers from './ClueAnswers'
+import CorrectResponse from './CorrectResponse'
 import WagerForm from './WagerForm'
 
 const MIN_DAILY_DOUBLE_WAGER = 5
@@ -113,11 +114,11 @@ function CluePanel({
               </div>
             )}
 
-            {isRevealing && clue.answer && (
-              <p className="tv-correct-response">
-                <span className="tv-kicker">Correct response</span>
-                <strong>{formatCorrectResponse(clue.answer)}</strong>
-              </p>
+            {isRevealing && (
+              <CorrectResponse
+                accepted={clue.acceptedAnswers}
+                match={session.clueAnswers.find(answer => answer.correct)}
+              />
             )}
 
             <ClueAnswers

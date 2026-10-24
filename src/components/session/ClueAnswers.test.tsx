@@ -12,6 +12,8 @@ const notAQuestion: ClueAnswer = {
   answer: 'Paris',
   correct: false,
   phrasedAsQuestion: false,
+  matchedAnswers: null,
+  alsoAccepted: null,
 }
 
 describe('ClueAnswers', () => {
@@ -49,7 +51,7 @@ describe('ClueAnswers', () => {
       <ClueAnswers
         answers={[
           { ...notAQuestion, answer: 'What is Paris?', phrasedAsQuestion: true },
-          { playerId: 2, answer: null, correct: false, phrasedAsQuestion: null },
+          { playerId: 2, answer: null, correct: false, phrasedAsQuestion: null, matchedAnswers: null, alsoAccepted: null },
         ]}
         players={[alice, bob]}
         round="DOUBLE_JEOPARDY"

@@ -16,6 +16,8 @@ function result(
     answer: correct ? 'What is Budapest?' : 'What is Vienna?',
     correct,
     phrasedAsQuestion: true,
+    matchedAnswers: correct ? ['Budapest'] : null,
+    alsoAccepted: correct ? [] : null,
   }
 }
 
@@ -36,6 +38,7 @@ const session = makeSession({
     question: 'Its Chain Bridge opened in 1849',
     numberExpected: false,
     answer: 'Budapest',
+    acceptedAnswers: { required: 1, options: ['Budapest'] },
     players: [result(1, 500, false), result(2, 100, false), result(3, 1000, true)],
   },
 })
