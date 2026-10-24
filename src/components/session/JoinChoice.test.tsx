@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, test, vi } from 'vitest'
 import type { JoinMode } from '../../navigation'
@@ -12,6 +13,30 @@ interface Options {
   action?: (playerName: string) => unknown
 }
 
+// The page keeps the mode, and has the "Join as player" button spectators use.
+function Page({
+  canJoin,
+  joinScore,
+  defaultMode,
+}: Required<Omit<Options, 'action'>>) {
+  const [mode, setMode] = useState(defaultMode)
+
+  return (
+    <>
+      <JoinChoice
+        canJoin={canJoin}
+        joinScore={joinScore}
+        mode={mode}
+        onModeChange={setMode}
+      />
+
+      {canJoin && mode === 'watch' && (
+        <button type="button" onClick={() => setMode('join')}>Join as player</button>
+      )}
+    </>
+  )
+}
+
 // JoinForm posts to its route's action, so render inside a router.
 function renderChoice({
   canJoin = true,
@@ -22,11 +47,7 @@ function renderChoice({
   const router = createMemoryRouter([{
     path: '/',
     element: (
-      <JoinChoice
-        canJoin={canJoin}
-        joinScore={joinScore}
-        defaultMode={defaultMode}
-      />
+      <Page canJoin={canJoin} joinScore={joinScore} defaultMode={defaultMode} />
     ),
     action: async ({ request }) =>
       action(String((await request.formData()).get('playerName'))),
@@ -54,7 +75,7 @@ describe('JoinChoice', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Watch as spectator' }))
     expect(screen.getByText(/You're watching as a spectator/)).toBeInTheDocument()
 
-    await userEvent.click(joinButton()!)
+    await userEvent.click(screen.getByRole('button', { name: 'Join as player' }))
     expect(nameInput()).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Just watch' }))

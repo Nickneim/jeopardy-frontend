@@ -1,5 +1,4 @@
 import type { BoardCategory } from '../../api/sessions'
-import { formatMoney } from '../../format'
 
 interface SessionBoardProps {
   board: BoardCategory[]
@@ -17,55 +16,51 @@ function SessionBoard({
 
   return (
     <div
-      className="game-board"
-      style={{ gridTemplateColumns: `repeat(${board.length}, minmax(100px, 1fr))` }}
+      className="tv-board"
+      style={{
+        gridTemplateColumns: `repeat(${board.length}, minmax(96px, 1fr))`,
+        gridTemplateRows: `minmax(110px, auto) repeat(${rows}, minmax(64px, 1fr))`,
+      }}
     >
       {board.map((category, column) => (
         <div
-          className="category-column"
-          key={column}
-          style={{ gridTemplateRows: `minmax(70px, auto) repeat(${rows}, 80px)` }}
+          key={`category-${column}`}
+          className="tv-board-category"
+          title={category.comments ?? undefined}
         >
-          <div
-            className="category-header"
-            title={category.comments ?? undefined}
-          >
-            {category.name}
-            {category.comments && (
-              <span className="category-comments-marker" aria-hidden="true">
-                {' '}ⓘ
-              </span>
-            )}
-          </div>
-
-          {category.slots.map(slot => {
-            if (slot.status !== 'AVAILABLE' || slot.clueId === null) {
-              return (
-                <div
-                  key={slot.row}
-                  className="clue-cell clue-cell-empty"
-                />
-              )
-            }
-
-            const clueId = slot.clueId
-
-            return (
-              <button
-                key={slot.row}
-                type="button"
-                className="clue-cell"
-                disabled={!canChoose}
-                onClick={() => onChoose(clueId)}
-              >
-                <span className="clue-value">
-                  {formatMoney(slot.value ?? 0)}
-                </span>
-              </button>
-            )
-          })}
+          {category.name}
+          {category.comments && (
+            <span className="category-comments-marker" aria-hidden="true">
+              {' '}ⓘ
+            </span>
+          )}
         </div>
       ))}
+
+      {Array.from({ length: rows }, (_, row) => board.map((category, column) => {
+        const slot = category.slots[row]
+        const key = `${row}-${column}`
+
+        if (!slot || slot.status !== 'AVAILABLE' || slot.clueId === null) {
+          return <div key={key} className="tv-board-cell" />
+        }
+
+        const clueId = slot.clueId
+
+        // TV boards show values without a thousands separator: $1000.
+        return (
+          <button
+            key={key}
+            type="button"
+            className="tv-board-cell"
+            aria-label={`${category.name} for $${slot.value ?? 0}`}
+            disabled={!canChoose}
+            onClick={() => onChoose(clueId)}
+          >
+            ${slot.value ?? 0}
+          </button>
+        )
+      }))}
     </div>
   )
 }

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { SessionTimers } from '../../api/sessions'
 import TimerSettings from './TimerSettings'
 
@@ -24,26 +23,12 @@ function Lobby({
   onUpdateTimers,
   onUpdateSettings,
 }: LobbyProps) {
-  const [copied, setCopied] = useState(false)
-
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href)
-      setCopied(true)
-    } catch {
-      setCopied(false)
-    }
-  }
-
   return (
     <section className="lobby">
       <p>
         Invite players with the game code{' '}
         <strong className="session-code">{code}</strong>{' '}
-        or this page's link.{' '}
-        <button type="button" onClick={copyLink}>
-          {copied ? 'Link copied' : 'Copy link'}
-        </button>
+        or the Share link button.
       </p>
 
       {isHost

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { JoinMode } from '../../navigation'
 import JoinForm from './JoinForm'
 
@@ -6,7 +5,10 @@ interface JoinChoiceProps {
   // False once the game has started, if the host blocked late joining.
   canJoin: boolean
   joinScore: number
-  defaultMode: JoinMode
+  // Kept by the page, whose "Join as player" button (next to the podiums)
+  // lets a spectator join later.
+  mode: JoinMode
+  onModeChange: (mode: JoinMode) => void
 }
 
 // What someone without a token sees: a choice between joining and
@@ -14,15 +16,13 @@ interface JoinChoiceProps {
 function JoinChoice({
   canJoin,
   joinScore,
-  defaultMode,
+  mode,
+  onModeChange,
 }: JoinChoiceProps) {
-  const [mode, setMode] = useState<JoinMode>(defaultMode)
-
   if (!canJoin) {
     return (
       <p>
-        This game has already started and doesn't accept new players.
-        You're watching as a spectator.
+        You're watching as a spectator: this game doesn't accept new players.
       </p>
     )
   }
@@ -31,20 +31,13 @@ function JoinChoice({
     return (
       <JoinForm
         joinScore={joinScore}
-        onCancel={() => setMode('watch')}
+        onCancel={() => onModeChange('watch')}
       />
     )
   }
 
   if (mode === 'watch') {
-    return (
-      <p>
-        You're watching as a spectator.{' '}
-        <button type="button" onClick={() => setMode('join')}>
-          Join this game
-        </button>
-      </p>
-    )
+    return <p>You're watching as a spectator.</p>
   }
 
   return (
@@ -52,7 +45,7 @@ function JoinChoice({
       <button
         type="button"
         className="primary-button"
-        onClick={() => setMode('join')}
+        onClick={() => onModeChange('join')}
       >
         Join this game
       </button>
@@ -60,7 +53,7 @@ function JoinChoice({
       <button
         type="button"
         className="primary-button"
-        onClick={() => setMode('watch')}
+        onClick={() => onModeChange('watch')}
       >
         Watch as spectator
       </button>

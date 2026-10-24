@@ -90,11 +90,31 @@ async function newPlayer(name) {
     await send('Page.navigate', { url }, sessionId)
     await sleep(300)
   }
-  page.text = () => page.eval('document.body.innerText')
+  // textContent, not innerText: the live game shows a lot in capitals.
+  page.text = () => page.eval('document.body.textContent')
   page.waitText = async (needle, ms = 5000) => {
     const end = Date.now() + ms
     while (Date.now() < end) {
       if ((await page.text()).includes(needle)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  // The player's own podium is the one with the buzzer.
+  page.waitPlayingAs = async (playerName, ms = 5000) => {
+    const end = Date.now() + ms
+    while (Date.now() < end) {
+      if (await page.eval(`document.querySelector('.podium.is-me .podium-name')?.textContent === ${JSON.stringify(playerName)}`)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  // Actions sent before the live connection is up are lost (the page shows
+  // "Connecting…" until then), so wait for it before starting a game.
+  page.waitConnected = async (ms = 5000) => {
+    const end = Date.now() + ms
+    while (Date.now() < end) {
+      if (await page.eval(`!!document.querySelector('.tv-status') && !document.querySelector('.connection-status')`)) return true
       await sleep(100)
     }
     return false
@@ -130,7 +150,8 @@ try {
   check('game page has Host live game', await alice.waitText('Host live game'))
   await alice.host('Alice')
   check('hosting joins as the host in one step, with editable timers',
-    await alice.waitText('Playing as Alice (host)') &&
+    await alice.waitPlayingAs('Alice') &&
+    (await alice.text()).includes('Start the game when everyone is here') &&
     (await alice.text()).includes('Start game') &&
     (await alice.text()).includes('Changes are saved as soon as you leave a field') &&
     !(await alice.text()).includes('Save timers') &&
@@ -149,7 +170,8 @@ try {
     await bob.waitText('Waiting for Alice to start the game') &&
     !(await bob.text()).includes('Changes are saved') &&
     (await bob.text()).includes('Buzzer'))
-  check('host sees Kick on Bob', await alice.waitText('Kick'))
+  check('host sees Kick on Bob', await alice.waitText('Bob') &&
+    await alice.eval(`document.querySelector('.kick-button')?.getAttribute('aria-label') === 'Kick Bob'`))
 
   // Timers.
   // Leaving the field saves it (React's onBlur listens to focusout).
@@ -198,18 +220,18 @@ try {
     !(await carol.text()).includes('Your name'))
   await carol.click('Watch as spectator')
   check('spectator mode', await carol.waitText("You're watching as a spectator"))
-  await carol.click('Join this game')
+  await carol.click('Join as player')
   check('spectator can open the join form', await carol.waitText('Your name'))
   await carol.click('Just watch')
   check('"Just watch" goes back to spectating', await carol.waitText("You're watching as a spectator"))
-  await carol.click('Join this game')
+  await carol.click('Join as player')
   await carol.waitText('Your name')
   await carol.join('Carol')
-  check('Carol joins', await carol.waitText('Playing as Carol'))
+  check('Carol joins', await carol.waitPlayingAs('Carol'))
   await alice.waitText('Carol')
   await alice.eval(`(() => {
-    const li = [...document.querySelectorAll('.scoreboard-player')].find(li => li.textContent.includes('Carol'))
-    li.querySelector('.kick-button').click()
+    const podium = [...document.querySelectorAll('.podium')].find(p => p.textContent.includes('Carol'))
+    podium.querySelector('.kick-button').click()
   })()`)
   check('kicking asks on the page first', await alice.waitText('Remove Carol from the game?'))
   await alice.click('Yes, kick')
@@ -220,14 +242,15 @@ try {
     await (async () => { await sleep(500); return !(await alice.text()).includes('Carol') })())
 
   // Start; late joining is off.
+  await alice.waitConnected()
   await alice.click('Start game')
-  check('game starts for both', await alice.waitText('Your turn: choose a clue') &&
+  check('game starts for both', await alice.waitText('Your pick · choose a clue') &&
     await bob.waitText('Alice is choosing a clue'))
   check('outsider sees "doesn\'t accept new players"',
     await carol.waitText("doesn't accept new players"))
 
   // Bob leaves mid-game.
-  await bob.click('Leave game')
+  await bob.click('Leave')
   check('leaving mid-game asks on the page first',
     await bob.waitText('Your score will be lost'))
   await bob.click('Yes, leave')
@@ -238,7 +261,7 @@ try {
     await (async () => { await sleep(500); return !(await alice.text()).includes('Bob') })())
 
   // Alice, the last player, leaves: back to the list, session gone.
-  await alice.click('Leave game')
+  await alice.click('Leave')
   check('the last player is told leaving closes the game',
     await alice.waitText('leaving closes this game'))
   await alice.click('Yes, leave')
@@ -253,19 +276,21 @@ try {
   await alice.waitText('Host live game')
   await alice.host('Alice')
   await alice.waitText('Start game')
+  await alice.waitConnected()
   await alice.click('Start game')
-  await alice.waitText('Your turn: choose a clue')
+  await alice.waitText('Your pick · choose a clue')
   const url2 = await alice.eval('location.href')
   await frank.goto(`${APP}/sessions`)
   await frank.waitText('hosted by Alice')
   await frank.eval(`[...document.querySelectorAll('a')].find(a => a.textContent === 'Watch' && a.href === ${JSON.stringify(url2)}).click()`)
   check('list Watch link opens in spectator mode, game visible',
     await frank.waitText("You're watching as a spectator") &&
-    await frank.waitText('Alice is choosing a clue'))
-  await frank.click('Join this game')
+    await frank.waitText('Alice is choosing a clue'),
+    (await frank.text()).slice(0, 300))
+  await frank.click('Join as player')
   await frank.waitText('Your name')
   await frank.join('Frank')
-  check('spectator joins mid-game', await frank.waitText('Playing as Frank'))
+  check('spectator joins mid-game', await frank.waitPlayingAs('Frank'))
   check('host sees the new player', await alice.waitText('Frank'))
   await frank.screenshot('joined-mid-game.png')
   await carol.goto(url2)

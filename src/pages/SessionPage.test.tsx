@@ -36,15 +36,15 @@ const session = makeSession({
   hostPlayerId: 1,
 })
 
-function renderSessionPage() {
+function renderSessionPage(shown: GameSession = session) {
   const router = createMemoryRouter([{
     path: '/sessions/:id',
     element: <SessionPage />,
     // Like sessionLoader, without the backend.
-    loader: () => ({ session, player: getStoredPlayer(SESSION_ID) }),
+    loader: () => ({ session: shown, player: getStoredPlayer(SESSION_ID) }),
   }], { initialEntries: [`/sessions/${SESSION_ID}`] })
 
-  render(<RouterProvider router={router} />)
+  return render(<RouterProvider router={router} />)
 }
 
 beforeEach(() => {
@@ -58,7 +58,13 @@ beforeEach(() => {
 describe('SessionPage', () => {
   test('a kicked player stays on as a spectator and is told why', async () => {
     renderSessionPage()
-    expect(await screen.findByText(/Playing as/)).toHaveTextContent('Bob')
+    // Bob's own podium is the one with the buzzer.
+    expect(await screen.findByRole('button', { name: 'Buzz in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument()
+
+    // Home opens in a new tab, so the game carries on in this one.
+    expect(screen.getByRole('link', { name: /Jeopardy! home/ }))
+      .toHaveAttribute('target', '_blank')
 
     await act(async () =>
       hook.onTokenRejected?.('You were removed from the session by the host'))
@@ -66,12 +72,14 @@ describe('SessionPage', () => {
     expect(await screen.findByText('You were removed from the session by the host'))
       .toBeInTheDocument()
     expect(screen.getByText(/You're watching as a spectator/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Buzz in' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Join as player' })).toBeInTheDocument()
     expect(getStoredPlayer(SESSION_ID)).toBeNull()
   })
 
   test('a later rejection without a reason keeps the notice', async () => {
     renderSessionPage()
-    await screen.findByText(/Playing as/)
+    await screen.findByRole('button', { name: 'Leave' })
 
     // Leaving, then the old connection's reconnect being rejected.
     await act(async () => hook.onTokenRejected?.('You left the game.'))
@@ -81,6 +89,57 @@ describe('SessionPage', () => {
     expect(screen.getByText('You left the game.')).toBeInTheDocument()
   })
 
+  test.each([
+    'FINAL_JEOPARDY_REVEALING',
+    'FINISHED_GAME',
+  ] as const)('nobody can leave or join once the game is decided (%s)', async state => {
+    const decided = { ...session, state, round: 'FINAL_JEOPARDY' as const }
+    const { unmount } = renderSessionPage(decided)
+
+    expect(await screen.findByRole('button', { name: 'Share link' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Buzz in' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument()
+
+    // A spectator isn't offered to join either.
+    unmount()
+    localStorage.clear()
+    renderSessionPage(decided)
+
+    expect(await screen.findByRole('button', { name: 'Share link' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Join/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/spectator/)).not.toBeInTheDocument()
+  })
+
+  test.each([
+    ['reconnecting', true],
+    ['connected', false],
+  ])('game buttons wait for the live connection (%s)', async (status, disabled) => {
+    hook.status = status
+    renderSessionPage({
+      ...session,
+      state: 'CHOOSING_CLUE',
+      playerChoosingClue: 2,
+      board: [{
+        name: 'POTENT POTABLES',
+        comments: null,
+        slots: [{ row: 1, clueId: 7, value: 200, status: 'AVAILABLE' }],
+      }],
+    })
+
+    const buttons = [
+      await screen.findByRole('button', { name: 'POTENT POTABLES for $200' }),
+      screen.getByRole('button', { name: 'Buzz in' }),
+      screen.getByRole('button', { name: 'Leave' }),
+    ]
+
+    // The clue cell is disabled through its fieldset, so check :disabled.
+    for (const button of buttons) {
+      expect(button.matches(':disabled')).toBe(disabled)
+    }
+    // Sharing the link doesn't need the connection.
+    expect(screen.getByRole('button', { name: 'Share link' })).toBeEnabled()
+  })
+
   test('shows the offline message when the server is unreachable', async () => {
     hook.status = 'offline'
     renderSessionPage()
@@ -88,6 +147,6 @@ describe('SessionPage', () => {
     expect(await screen.findByText(/The game server is offline right now/))
       .toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
-    expect(screen.queryByText(/Playing as/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument()
   })
 })

@@ -86,7 +86,7 @@ describe('FinalJeopardyPanel', () => {
     const rejoined = makePlayer({ id: 2, name: 'Alice', score: 0 })
     renderPanel(finalJeopardy('FINAL_JEOPARDY_WAGERING'), rejoined)
 
-    expect(screen.queryByText(/Your wager/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Your wager:/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Place wager' })).toBeInTheDocument()
   })
 
@@ -98,6 +98,6 @@ describe('FinalJeopardyPanel', () => {
     forgetPlayer(SESSION_ID)
     renderPanel(finalJeopardy('FINAL_JEOPARDY_WAGERING'))
 
-    expect(screen.queryByText(/Your wager/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Your wager:/)).not.toBeInTheDocument()
   })
 })

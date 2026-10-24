@@ -9,18 +9,24 @@ import {
 import type { SessionActions } from '../../hooks/useGameSession'
 import { formatCorrectResponse, formatMoney } from '../../format'
 import AnswerForm from './AnswerForm'
+import FinalReveal from './FinalReveal'
+import type { FinalRevealProgress } from './revealProgress'
 import WagerForm from './WagerForm'
 
 interface FinalJeopardyPanelProps {
   session: GameSession
   me: Player | null
   actions: SessionActions
+  // Where the reveal is (finalRevealProgress); null shows every result.
+  reveal?: FinalRevealProgress | null
 }
 
+// The main screen from Final Jeopardy's category to its reveal.
 function FinalJeopardyPanel({
   session,
   me,
   actions,
+  reveal = null,
 }: FinalJeopardyPanelProps) {
   // Wagers and answers stay hidden from everyone until the reveal, so the
   // player's own are remembered to show them back, across refreshes too.
@@ -36,8 +42,8 @@ function FinalJeopardyPanel({
     return null
   }
 
-  const isRevealed = session.state === 'FINAL_JEOPARDY_REVEALING' ||
-    session.state === 'FINISHED_GAME'
+  const isWagering = session.state === 'FINAL_JEOPARDY_WAGERING'
+  const isRevealing = session.state === 'FINAL_JEOPARDY_REVEALING'
 
   function remember(update: Partial<SentFinalJeopardy>) {
     const next = { ...sent, ...update }
@@ -59,26 +65,35 @@ function FinalJeopardyPanel({
   }
 
   return (
-    <section className="clue-panel">
-      <p className="clue-panel-heading">
-        Final Jeopardy! — {final.category}
+    <>
+      <p className="tv-heading">
+        <span className="tv-gold">Final Jeopardy</span>
+        {!isWagering && <span>{final.category}</span>}
       </p>
 
-      {final.categoryComments && (
-        <p className="category-comments">{final.categoryComments}</p>
+      {isWagering && (
+        <div className="tv-category">
+          <span className="tv-kicker">The category is</span>
+          <h2>{final.category}</h2>
+          {final.categoryComments && (
+            <p className="tv-comments">{final.categoryComments}</p>
+          )}
+        </div>
       )}
 
       {final.question && (
-        <p
-          className="clue-question"
-          dangerouslySetInnerHTML={{ __html: final.question }}
-        />
+        <div className={isRevealing ? 'tv-question-box is-small' : 'tv-question-box'}>
+          <p
+            className="tv-question"
+            dangerouslySetInnerHTML={{ __html: final.question }}
+          />
+        </div>
       )}
 
-      {me && session.state === 'FINAL_JEOPARDY_WAGERING' && (
+      {me && isWagering && (
         <>
           {myWager !== null && (
-            <p>
+            <p className="tv-form-hint">
               Your wager: {formatMoney(myWager)}.
               You can change it until time runs out.
             </p>
@@ -96,79 +111,35 @@ function FinalJeopardyPanel({
       {me && session.state === 'FINAL_JEOPARDY_ANSWERING' && (
         <>
           {myAnswer !== null && (
-            <p>
+            <p className="tv-form-hint">
               Your answer: “{myAnswer}”.
               You can change it until time runs out.
             </p>
           )}
 
           <AnswerForm
-            label="Your answer"
+            label="Your response"
             submitLabel={myAnswer === null ? 'Answer' : 'Change answer'}
             numberExpected={final.numberExpected === true}
+            handwritten
             onSubmit={answer}
           />
         </>
       )}
 
-      {isRevealed && final.answer && (
-        <p className="clue-answer">Correct response: {formatCorrectResponse(final.answer)}</p>
+      {isRevealing && (
+        <>
+          <FinalReveal players={session.players} reveal={reveal} final={final} />
+
+          {(reveal === null || reveal.showCorrectResponse) && final.answer && (
+            <p className="tv-correct-response">
+              <span className="tv-kicker">Correct response</span>
+              <strong>{formatCorrectResponse(final.answer)}</strong>
+            </p>
+          )}
+        </>
       )}
-
-      <table className="final-jeopardy-table">
-        <thead>
-          <tr>
-            <th>Player</th>
-            {isRevealed
-              ? (
-                <>
-                  <th>Answer</th>
-                  <th>Wager</th>
-                </>
-              )
-              : (
-                <>
-                  <th>Wagered</th>
-                  <th>Answered</th>
-                </>
-              )}
-          </tr>
-        </thead>
-
-        <tbody>
-          {final.players.map(result => {
-            const name = session.players
-              .find(p => p.id === result.playerId)?.name
-
-            return (
-              <tr key={result.playerId}>
-                <td>{name}</td>
-
-                {isRevealed
-                  ? (
-                    <>
-                      <td className={result.correct ? 'correct' : 'wrong'}>
-                        {result.correct ? '✓' : '✗'}{' '}
-                        {result.answer ?? <em>no answer</em>}
-                        {!result.correct && result.phrasedAsQuestion === false && (
-                          <em> (not phrased as a question)</em>
-                        )}
-                      </td>
-                      <td>{formatMoney(result.wager ?? 0)}</td>
-                    </>
-                  )
-                  : (
-                    <>
-                      <td>{result.hasWagered ? '✓' : '…'}</td>
-                      <td>{result.hasAnswered ? '✓' : '…'}</td>
-                    </>
-                  )}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </section>
+    </>
   )
 }
 

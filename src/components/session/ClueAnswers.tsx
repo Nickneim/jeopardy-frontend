@@ -1,4 +1,6 @@
 import type { ClueAnswer, GameRound, Player } from '../../api/sessions'
+import { formatMoney } from '../../format'
+import { CheckIcon, CrossIcon } from './icons'
 
 interface ClueAnswersProps {
   answers: ClueAnswer[]
@@ -6,6 +8,8 @@ interface ClueAnswersProps {
   // The round the answers were given in (clueAnswersRound).
   round: GameRound
   me: Player | null
+  // What each answer won or lost: the clue's value or Daily Double wager.
+  amount?: number
 }
 
 function ClueAnswers({
@@ -13,6 +17,7 @@ function ClueAnswers({
   players,
   round,
   me,
+  amount,
 }: ClueAnswersProps) {
   if (answers.length === 0) {
     return null
@@ -30,23 +35,41 @@ function ClueAnswers({
 
   return (
     <>
-      <ul className="clue-answers">
+      <ol className="clue-answers" aria-label="Answers">
         {answers.map((answer, index) => (
           <li
             key={index}
-            className={answer.correct ? 'correct' : 'wrong'}
+            className={answer.correct
+              ? 'clue-answer-row correct'
+              : 'clue-answer-row wrong'}
           >
-            {answer.correct ? '✓' : '✗'} {playerName(answer.playerId)}:{' '}
-            {answer.answer === null
-              ? <em>ran out of time</em>
-              : `“${answer.answer}”`}
-            {questionRequired && !answer.correct &&
-              answer.phrasedAsQuestion === false && (
-              <em> (not phrased as a question)</em>
-            )}
+            <span className="clue-answer-name tv-hand">
+              {playerName(answer.playerId)}
+            </span>
+
+            <span className="clue-answer-text">
+              {answer.answer === null
+                ? <em>ran out of time</em>
+                : answer.answer}
+              {questionRequired && !answer.correct &&
+                answer.phrasedAsQuestion === false && (
+                <em> (not phrased as a question)</em>
+              )}
+            </span>
+
+            <span
+              className={answer.correct
+                ? 'tv-result is-correct'
+                : 'tv-result is-wrong'}
+            >
+              {answer.correct ? <CheckIcon /> : <CrossIcon />}
+              {amount === undefined
+                ? (answer.correct ? 'Correct' : 'Wrong')
+                : `${answer.correct ? '+' : '−'}${formatMoney(amount)}`}
+            </span>
           </li>
         ))}
-      </ul>
+      </ol>
 
       {warnMe && (
         <p className="answer-hint">

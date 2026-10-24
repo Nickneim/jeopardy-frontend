@@ -2,16 +2,21 @@ import { useEffect } from 'react'
 
 interface BuzzButtonProps {
   enabled: boolean
+  // Not connected yet: a buzz would be lost.
+  disabled?: boolean
   onBuzz: () => void
 }
 
+// The red button on the player's own podium. It can always be pressed, like
+// a real buzzer, but only buzzes while the buzzers are open.
 function BuzzButton({
   enabled,
+  disabled = false,
   onBuzz,
 }: BuzzButtonProps) {
   // The space bar buzzes too, unless the player is typing somewhere.
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || disabled) {
       return
     }
 
@@ -27,17 +32,21 @@ function BuzzButton({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [enabled, onBuzz])
+  }, [enabled, disabled, onBuzz])
 
   return (
     <button
       type="button"
       className="buzz-button"
-      disabled={!enabled}
-      onClick={onBuzz}
-    >
-      Buzz <kbd>Space</kbd>
-    </button>
+      aria-label="Buzz in"
+      title="Buzz in (Space)"
+      disabled={disabled}
+      onClick={() => {
+        if (enabled) {
+          onBuzz()
+        }
+      }}
+    />
   )
 }
 

@@ -5,6 +5,8 @@ interface AnswerFormProps {
   submitLabel: string
   // Only an exact number is accepted, so typos aren't forgiven.
   numberExpected?: boolean
+  // Written by hand, like Final Jeopardy responses on the show.
+  handwritten?: boolean
   onSubmit: (answer: string) => void
 }
 
@@ -12,9 +14,11 @@ function AnswerForm({
   label,
   submitLabel,
   numberExpected = false,
+  handwritten = false,
   onSubmit,
 }: AnswerFormProps) {
   const [answer, setAnswer] = useState('')
+  const inputId = useId()
   const hintId = useId()
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -30,21 +34,24 @@ function AnswerForm({
     : null
 
   return (
-    <form className="answer-form" onSubmit={handleSubmit}>
-      <label>
-        {label}
+    <form className="tv-form" onSubmit={handleSubmit}>
+      <label htmlFor={inputId} className="tv-form-label">{label}</label>
+
+      <div className="tv-form-row">
         <input
+          id={inputId}
+          className={handwritten ? 'is-hand' : 'is-serif'}
           value={answer}
           onChange={event => setAnswer(event.target.value)}
           autoFocus
           autoComplete="off"
           aria-describedby={hint ? hintId : undefined}
         />
-      </label>
 
-      <button type="submit" disabled={!answer.trim()}>
-        {submitLabel}
-      </button>
+        <button type="submit" disabled={!answer.trim()}>
+          {submitLabel}
+        </button>
+      </div>
 
       {hint && <p id={hintId} className="answer-hint">{hint}</p>}
     </form>

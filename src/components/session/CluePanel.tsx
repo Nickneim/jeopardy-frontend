@@ -3,7 +3,6 @@ import type { SessionActions } from '../../hooks/useGameSession'
 import { formatCorrectResponse, formatMoney } from '../../format'
 import ClueMedia from '../ClueMedia'
 import AnswerForm from './AnswerForm'
-import BuzzButton from './BuzzButton'
 import ClueAnswers from './ClueAnswers'
 import WagerForm from './WagerForm'
 
@@ -15,6 +14,8 @@ interface CluePanelProps {
   actions: SessionActions
 }
 
+// The main screen while a clue is in play: from a Daily Double's wager to
+// the answer reveal. Buzzing is on the player's podium.
 function CluePanel({
   session,
   me,
@@ -34,12 +35,8 @@ function CluePanel({
     return session.players.find(player => player.id === id)?.name ?? 'Someone'
   }
 
-  const isLockedOut = me !== null && session.playersLockedOut.includes(me.id)
-  const canBuzz = me !== null &&
-    session.state === 'WAITING_FOR_BUZZER' &&
-    !isLockedOut
-  const isMyWager = me !== null &&
-    session.state === 'WAITING_FOR_DAILY_DOUBLE_WAGER' &&
+  const isWagering = session.state === 'WAITING_FOR_DAILY_DOUBLE_WAGER'
+  const isMyWager = me !== null && isWagering &&
     session.playerChoosingClue === me.id
 
   // The most a player can wager: their score, or the round's top clue value.
@@ -52,83 +49,105 @@ function CluePanel({
   const isMyAnswer = me !== null &&
     session.state === 'WAITING_FOR_ANSWER' &&
     session.playerAnswering === me.id
+  const isRevealing = session.state === 'REVEALING_ANSWER'
+  const hasAnswers = session.clueAnswers.length > 0
 
   return (
-    <section className="clue-panel">
-      <p className="clue-panel-heading">
-        {category?.name}
-        {' — '}
-        {clue.dailyDouble && clue.wager !== null
-          ? `Daily Double, wager ${formatMoney(clue.wager)}`
-          : formatMoney(clue.value)}
+    <>
+      <p className="tv-heading">
+        <span>{category?.name}</span>
+        {clue.dailyDouble
+          ? <span className="tv-gold">Daily Double</span>
+          : <span className="tv-gold">{formatMoney(clue.value)}</span>}
+        {clue.dailyDouble && clue.wager !== null && (
+          <span>Wager <span className="tv-gold">{formatMoney(clue.wager)}</span></span>
+        )}
       </p>
 
-      {clue.dailyDouble && (
-        <p className="daily-double-banner">Daily Double!</p>
-      )}
-
       {category?.comments && (
-        <p className="category-comments">{category.comments}</p>
+        <p className="tv-comments">{category.comments}</p>
       )}
 
-      <ClueMedia clueType={clue.clueType} mediaUrl={clue.mediaUrl} />
+      {isWagering
+        ? (
+          <>
+            <h2 className="tv-title">
+              <span>Daily</span>
+              <span>Double</span>
+            </h2>
 
-      {clue.question && (
-        <p
-          className="clue-question"
-          dangerouslySetInnerHTML={{ __html: clue.question }}
-        />
-      )}
+            {isMyWager
+              ? (
+                <WagerForm
+                  min={MIN_DAILY_DOUBLE_WAGER}
+                  max={maxDailyDoubleWager}
+                  submitLabel="Wager"
+                  allIn
+                  onSubmit={actions.placeDailyDoubleWager}
+                />
+              )
+              : (
+                <p className="tv-waiting">
+                  <span className="tv-hand">
+                    {playerName(session.playerChoosingClue)}
+                  </span>
+                  <span>is making a wager…</span>
+                </p>
+              )}
+          </>
+        )
+        : (
+          <>
+            <ClueMedia clueType={clue.clueType} mediaUrl={clue.mediaUrl} />
 
-      <ClueAnswers
-        answers={session.clueAnswers}
-        players={session.players}
-        round={clueAnswersRound(session)}
-        me={me}
-      />
+            {clue.question && (
+              <div
+                className={isRevealing || hasAnswers
+                  ? 'tv-question-box is-small'
+                  : 'tv-question-box'}
+              >
+                <p
+                  className="tv-question"
+                  dangerouslySetInnerHTML={{ __html: clue.question }}
+                />
+              </div>
+            )}
 
-      {session.state === 'REVEALING_ANSWER' && clue.answer && (
-        <p className="clue-answer">
-          Correct response: {formatCorrectResponse(clue.answer)}
-        </p>
-      )}
+            {isRevealing && clue.answer && (
+              <p className="tv-correct-response">
+                <span className="tv-kicker">Correct response</span>
+                <strong>{formatCorrectResponse(clue.answer)}</strong>
+              </p>
+            )}
 
-      {isMyWager && (
-        <WagerForm
-          min={MIN_DAILY_DOUBLE_WAGER}
-          max={maxDailyDoubleWager}
-          submitLabel="Place wager"
-          onSubmit={actions.placeDailyDoubleWager}
-        />
-      )}
+            <ClueAnswers
+              answers={session.clueAnswers}
+              players={session.players}
+              round={clueAnswersRound(session)}
+              me={me}
+              amount={clue.wager ?? clue.value}
+            />
 
-      {session.state === 'WAITING_FOR_DAILY_DOUBLE_WAGER' && !isMyWager && (
-        <p>{playerName(session.playerChoosingClue)} is placing a wager…</p>
-      )}
+            {isMyAnswer && (
+              <AnswerForm
+                label="Your response"
+                submitLabel="Answer"
+                numberExpected={clue.numberExpected === true}
+                onSubmit={actions.answer}
+              />
+            )}
 
-      {me && !clue.dailyDouble &&
-        (session.state === 'REVEALING_CLUE' ||
-          session.state === 'WAITING_FOR_BUZZER') && (
-        <BuzzButton enabled={canBuzz} onBuzz={actions.buzz} />
-      )}
-
-      {isLockedOut && session.state === 'WAITING_FOR_BUZZER' && (
-        <p>You already buzzed on this clue.</p>
-      )}
-
-      {isMyAnswer && (
-        <AnswerForm
-          label="Your answer"
-          submitLabel="Answer"
-          numberExpected={clue.numberExpected === true}
-          onSubmit={actions.answer}
-        />
-      )}
-
-      {session.state === 'WAITING_FOR_ANSWER' && !isMyAnswer && (
-        <p>{playerName(session.playerAnswering)} is answering…</p>
-      )}
-    </section>
+            {session.state === 'WAITING_FOR_ANSWER' && !isMyAnswer && (
+              <p className="tv-waiting">
+                <span className="tv-hand">
+                  {playerName(session.playerAnswering)}
+                </span>
+                <span>is answering…</span>
+              </p>
+            )}
+          </>
+        )}
+    </>
   )
 }
 

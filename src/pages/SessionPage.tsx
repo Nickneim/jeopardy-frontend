@@ -7,7 +7,6 @@ import {
   useRevalidator,
 } from 'react-router'
 import {
-  clueAnswersRound,
   forgetPlayer,
   getStoredPlayer,
   type GameSession,
@@ -17,18 +16,23 @@ import {
   type SessionCloseReason,
   type SessionLoaderData,
 } from '../api/sessions'
-import ClueAnswers from '../components/session/ClueAnswers'
 import CluePanel from '../components/session/CluePanel'
 import ConfirmButton from '../components/session/ConfirmButton'
-import Countdown from '../components/session/Countdown'
 import FinalJeopardyPanel from '../components/session/FinalJeopardyPanel'
+import { finalRevealProgress } from '../components/session/revealProgress'
 import GameResult from '../components/session/GameResult'
+import { JoinIcon, LeaveIcon } from '../components/session/icons'
 import JoinChoice from '../components/session/JoinChoice'
 import ServerOffline from '../components/ServerOffline'
 import Lobby from '../components/session/Lobby'
-import Scoreboard from '../components/session/Scoreboard'
+import { PODIUM_LIGHTS } from '../components/session/Podium'
+import PodiumRow from '../components/session/PodiumRow'
 import SessionBoard from '../components/session/SessionBoard'
+import { sessionStatus } from '../components/session/sessionStatus'
+import ShareLinkButton from '../components/session/ShareLinkButton'
+import StatusBar from '../components/session/StatusBar'
 import { ROUND_NAMES } from '../format'
+import { useCountdown } from '../hooks/useCountdown'
 import { useGameSession } from '../hooks/useGameSession'
 import { linkedJoinMode, type JoinMode } from '../navigation'
 
@@ -44,8 +48,15 @@ const FINAL_JEOPARDY_STATES = new Set<GameSessionState>([
   'FINAL_JEOPARDY_WAGERING',
   'FINAL_JEOPARDY_ANSWERING',
   'FINAL_JEOPARDY_REVEALING',
-  'FINISHED_GAME',
 ])
+
+// The lights on a podium count down these phases' time.
+const LIT_STATES = new Set<GameSessionState>([
+  'WAITING_FOR_DAILY_DOUBLE_WAGER',
+  'WAITING_FOR_ANSWER',
+])
+
+const NO_SCORES = new Map<number, number>()
 
 const CLOSE_MESSAGES: Record<SessionCloseReason, string> = {
   ABANDONED: 'Everyone left, so this game has ended.',
@@ -69,7 +80,7 @@ interface LiveSessionProps {
 function LiveSession({
   initial,
   player,
-  joinMode,
+  joinMode: initialJoinMode,
   onTokenRejected,
 }: LiveSessionProps) {
   const { session, receivedAt, status, error, actions } = useGameSession(
@@ -78,6 +89,8 @@ function LiveSession({
     onTokenRejected,
   )
   const navigate = useNavigate()
+  const [joinMode, setJoinMode] = useState<JoinMode>(initialJoinMode)
+  const leftMs = useCountdown(session.phaseRemainingMs, receivedAt)
 
   const isClosed = session.state === 'CLOSED'
 
@@ -104,17 +117,22 @@ function LiveSession({
 
   if (isClosed) {
     return (
-      <main className="live-session">
-        <h1>Game over</h1>
-        <p>{CLOSE_MESSAGES[session.closeReason ?? 'FINISHED']}</p>
+      <main className="live-session tv-stage">
+        <h1 className="visually-hidden">Game over</h1>
 
-        {session.closeReason === 'FINISHED' && (
-          <GameResult players={session.players} />
-        )}
+        <div className="tv-screen">
+          <p className="tv-waiting">
+            {CLOSE_MESSAGES[session.closeReason ?? 'FINISHED']}
+          </p>
 
-        <Scoreboard session={session} myPlayerId={null} />
+          {session.closeReason === 'FINISHED' && (
+            <GameResult players={session.players} myPlayerId={player?.playerId} />
+          )}
 
-        <Link to="/sessions">See other live games</Link>
+          <div className="tv-links">
+            <Link to="/sessions">See other live games</Link>
+          </div>
+        </div>
       </main>
     )
   }
@@ -122,8 +140,6 @@ function LiveSession({
   const me = session.players.find(p => p.id === player?.playerId) ?? null
   const isHost = me !== null && session.hostPlayerId === me.id
   const isMyChoice = me !== null && session.playerChoosingClue === me.id
-  const chooserName = session.players
-    .find(p => p.id === session.playerChoosingClue)?.name
   const hostName = session.players
     .find(p => p.id === session.hostPlayerId)?.name ?? null
 
@@ -157,109 +173,185 @@ function LiveSession({
     actions.kick(target.id)
   }
 
+  const state = session.state
+  const isConnected = status === 'connected'
+  const reveal = finalRevealProgress(session, leftMs)
+  // From the Final Jeopardy reveal on the game is decided: nobody joins or
+  // leaves any more.
+  const isOver = state === 'FINAL_JEOPARDY_REVEALING' ||
+    state === 'FINISHED_GAME'
+  const canJoin = !isOver &&
+    (state === 'WAITING_FOR_START' || session.allowLateJoin)
+  const lockedOut = session.playersLockedOut
+    .filter(id => id !== session.playerAnswering)
+  const canBuzz = me !== null && state === 'WAITING_FOR_BUZZER' &&
+    !session.playersLockedOut.includes(me.id)
+
+  // Whose podium glows: choosing, answering, wagering or being revealed.
+  const activeId = reveal
+    ? reveal.order[reveal.index].playerId
+    : state === 'WAITING_FOR_ANSWER'
+      ? session.playerAnswering
+      : state === 'CHOOSING_CLUE' || session.currentClue?.dailyDouble
+        ? session.playerChoosingClue
+        : null
+  const lights = LIT_STATES.has(state) && leftMs !== null &&
+    session.phaseDurationMs
+    ? Math.ceil((PODIUM_LIGHTS * leftMs) / session.phaseDurationMs)
+    : 0
+
+  // Who has wagered or answered in Final Jeopardy is public; what isn't.
+  const badges = new Map<number, string>()
+  for (const result of session.finalJeopardy?.players ?? []) {
+    if (state === 'FINAL_JEOPARDY_WAGERING' && result.hasWagered) {
+      badges.set(result.playerId, 'Wagered')
+    } else if (state === 'FINAL_JEOPARDY_ANSWERING' && result.hasAnswered) {
+      badges.set(result.playerId, 'Answered')
+    }
+  }
+
   return (
-    <main className="live-session">
-      <h1>
-        {session.state === 'WAITING_FOR_START'
-          ? 'Live game'
-          : ROUND_NAMES[session.round]}
+    <main className="live-session tv-stage">
+      <h1 className="visually-hidden">
+        {state === 'WAITING_FOR_START' ? 'Live game' : ROUND_NAMES[session.round]}
       </h1>
 
       {status !== 'connected' && (
-        <p className="connection-status" role="status">
+        <p className="tv-strip connection-status" role="status">
           {STATUS_MESSAGES[status]}
         </p>
       )}
 
       {error && (
-        <p className="session-error" role="alert">{error.message}</p>
+        <p className="tv-strip session-error" role="alert">{error.message}</p>
       )}
 
-      {me
-        ? (
-          <p>
-            Playing as <strong>{me.name}</strong>
-            {isHost && ' (host)'}{' '}
-            <ConfirmButton
-              label="Leave game"
-              question={leaveQuestion}
-              confirmLabel="Yes, leave"
-              onConfirm={leave}
+      <div className={state === 'CHOOSING_CLUE' ? 'tv-screen is-board' : 'tv-screen'}>
+        {/* Game actions go over the live connection: until it's up, a click
+            would be lost, so every control on the screen waits for it. */}
+        <fieldset className="tv-screen-content" disabled={!isConnected}>
+          {state === 'WAITING_FOR_START' && (
+            <Lobby
+              code={session.id}
+              isHost={isHost}
+              hostName={hostName}
+              timers={session.timers}
+              allowLateJoin={session.allowLateJoin}
+              onStart={actions.start}
+              onUpdateTimers={actions.updateTimers}
+              onUpdateSettings={actions.updateSettings}
             />
-          </p>
-        )
-        : (
-          <JoinChoice
-            canJoin={session.state === 'WAITING_FOR_START' ||
-              session.allowLateJoin}
-            joinScore={session.joinScore}
-            defaultMode={joinMode}
-          />
+          )}
+
+          {state === 'CHOOSING_CLUE' && (
+            <SessionBoard
+              board={session.board}
+              canChoose={isMyChoice}
+              onChoose={actions.chooseClue}
+            />
+          )}
+
+          {CLUE_STATES.has(state) && (
+            <CluePanel session={session} me={me} actions={actions} />
+          )}
+
+          {FINAL_JEOPARDY_STATES.has(state) && (
+            <FinalJeopardyPanel
+              session={session}
+              me={me}
+              actions={actions}
+              reveal={reveal}
+            />
+          )}
+
+          {state === 'FINISHED_GAME' && (
+            <>
+              <GameResult
+                players={session.players}
+                final={session.finalJeopardy}
+                myPlayerId={me?.id}
+              />
+
+              <div className="tv-links">
+                <Link to="/sessions">Back to live games</Link>
+                <Link to="/games">Play another game</Link>
+              </div>
+            </>
+          )}
+        </fieldset>
+
+        {!me && canJoin && joinMode !== 'watch' && (
+          <div className="tv-overlay">
+            <JoinChoice
+              canJoin={canJoin}
+              joinScore={session.joinScore}
+              mode={joinMode}
+              onModeChange={setJoinMode}
+            />
+          </div>
         )}
+      </div>
 
-      <Scoreboard
-        session={session}
-        myPlayerId={me?.id ?? null}
-        onKick={isHost ? kick : undefined}
-      />
-
-      <Countdown
+      <StatusBar
+        round={state === 'WAITING_FOR_START' ? null : ROUND_NAMES[session.round]}
+        status={sessionStatus(session, me)}
         durationMs={session.phaseDurationMs}
-        remainingMs={session.phaseRemainingMs}
-        receivedAt={receivedAt}
+        leftMs={leftMs}
       />
 
-      {session.state === 'WAITING_FOR_START' && (
-        <Lobby
-          code={session.id}
-          isHost={isHost}
-          hostName={hostName}
-          timers={session.timers}
-          allowLateJoin={session.allowLateJoin}
-          onStart={actions.start}
-          onUpdateTimers={actions.updateTimers}
-          onUpdateSettings={actions.updateSettings}
-        />
-      )}
+      <PodiumRow
+        players={session.players}
+        me={me}
+        activeId={activeId}
+        lights={lights}
+        lockedOut={lockedOut}
+        badges={badges}
+        scores={reveal?.scores ?? NO_SCORES}
+        isConnected={isConnected}
+        canBuzz={canBuzz}
+        onBuzz={actions.buzz}
+        onKick={isHost ? kick : undefined}
+        actions={
+          <>
+            {/* Spectating is said here, by the buttons, not on the screen. */}
+            {!me && !isOver && (!canJoin || joinMode === 'watch') && (
+              <div className="podium-actions-note">
+                <JoinChoice
+                  canJoin={canJoin}
+                  joinScore={session.joinScore}
+                  mode={joinMode}
+                  onModeChange={setJoinMode}
+                />
+              </div>
+            )}
 
-      {session.state === 'CHOOSING_CLUE' && (
-        <>
-          <ClueAnswers
-            answers={session.clueAnswers}
-            players={session.players}
-            round={clueAnswersRound(session)}
-            me={me}
-          />
+            {!me && canJoin && joinMode === 'watch' && (
+              <button
+                type="button"
+                className="tv-action is-primary"
+                onClick={() => setJoinMode('join')}
+              >
+                <JoinIcon />
+                Join as player
+              </button>
+            )}
 
-          <p>
-            {isMyChoice
-              ? 'Your turn: choose a clue.'
-              : `${chooserName ?? 'Someone'} is choosing a clue…`}
-          </p>
+            <ShareLinkButton />
 
-          <SessionBoard
-            board={session.board}
-            canChoose={isMyChoice}
-            onChoose={actions.chooseClue}
-          />
-        </>
-      )}
-
-      {CLUE_STATES.has(session.state) && (
-        <CluePanel session={session} me={me} actions={actions} />
-      )}
-
-      {session.state === 'FINISHED_GAME' && (
-        <GameResult players={session.players} />
-      )}
-
-      {FINAL_JEOPARDY_STATES.has(session.state) && (
-        <FinalJeopardyPanel session={session} me={me} actions={actions} />
-      )}
-
-      {session.state === 'FINISHED_GAME' && (
-        <Link to="/games">Play another game</Link>
-      )}
+            {me && !isOver && (
+              <ConfirmButton
+                label="Leave"
+                content={<><LeaveIcon />Leave</>}
+                question={leaveQuestion}
+                confirmLabel="Yes, leave"
+                className="tv-action"
+                disabled={!isConnected}
+                onConfirm={leave}
+              />
+            )}
+          </>
+        }
+      />
     </main>
   )
 }
