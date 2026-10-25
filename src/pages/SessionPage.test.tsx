@@ -58,10 +58,8 @@ beforeEach(() => {
 describe('SessionPage', () => {
   test('a kicked player stays on as a spectator and is told why', async () => {
     renderSessionPage()
-    // Bob's own podium is the one with the buzzer. The file's first render is
-    // slow on a busy machine, so wait longer than the default second.
-    expect(await screen.findByRole('button', { name: 'Buzz in' }, { timeout: 5000 }))
-      .toBeInTheDocument()
+    // Bob's own podium is the one with the buzzer.
+    expect(await screen.findByRole('button', { name: 'Buzz in' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument()
 
     // Home opens in a new tab, so the game carries on in this one.

@@ -28,5 +28,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     // Claude Code's git worktrees live in .claude/worktrees: not this code.
     exclude: [...configDefaults.exclude, '.claude/**'],
+    // Every file sets up its own jsdom, all in parallel, so on a busy machine
+    // tests that click and type can take longer than the default 5 seconds.
+    testTimeout: 15000,
   },
 })
