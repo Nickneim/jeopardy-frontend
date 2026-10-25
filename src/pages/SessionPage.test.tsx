@@ -1,15 +1,20 @@
 import { act, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getStoredPlayer, type GameSession } from '../api/sessions'
+import {
+  getStoredPlayer,
+  type GameSession,
+  type JoinedPlayer,
+} from '../api/sessions'
+import type { SessionEnd } from '../hooks/useGameSession'
 import { makePlayer, makeSession, SESSION_ID } from '../test/fixtures'
 import SessionPage from './SessionPage'
 
-// Replace the live connection: the test calls onTokenRejected itself, the
-// way the hook does when the server rejects or closes the connection.
+// Replace the live connection: the test calls onEnded itself, the way the
+// hook does when the connection ends for good.
 const { hook } = vi.hoisted(() => ({
   hook: {} as {
-    onTokenRejected?: (reason: string | null) => void
+    onEnded?: (ended: SessionEnd) => void
     status?: string
   },
 }))
@@ -17,10 +22,10 @@ const { hook } = vi.hoisted(() => ({
 vi.mock('../hooks/useGameSession', () => ({
   useGameSession: (
     initial: GameSession,
-    _token: string | null,
-    onTokenRejected: (reason: string | null) => void,
+    _player: JoinedPlayer | null,
+    onEnded: (ended: SessionEnd) => void,
   ) => {
-    hook.onTokenRejected = onTokenRejected
+    hook.onEnded = onEnded
     return {
       session: initial,
       receivedAt: 0,
@@ -30,6 +35,8 @@ vi.mock('../hooks/useGameSession', () => ({
     }
   },
 }))
+
+const STORAGE_KEY = `jeopardy.session.${SESSION_ID}`
 
 const session = makeSession({
   players: [makePlayer({ id: 1, name: 'Alice' }), makePlayer({ id: 2, name: 'Bob' })],
@@ -42,6 +49,9 @@ function renderSessionPage(shown: GameSession = session) {
     element: <SessionPage />,
     // Like sessionLoader, without the backend.
     loader: () => ({ session: shown, player: getStoredPlayer(SESSION_ID) }),
+  }, {
+    path: '/sessions',
+    element: <p>Live games</p>,
   }], { initialEntries: [`/sessions/${SESSION_ID}`] })
 
   return render(<RouterProvider router={router} />)
@@ -50,7 +60,7 @@ function renderSessionPage(shown: GameSession = session) {
 beforeEach(() => {
   hook.status = undefined
   localStorage.setItem(
-    `jeopardy.session.${SESSION_ID}`,
+    STORAGE_KEY,
     JSON.stringify({ playerId: 2, token: 'secret' }),
   )
 })
@@ -66,8 +76,10 @@ describe('SessionPage', () => {
     expect(screen.getByRole('link', { name: /Jeopardy! home/ }))
       .toHaveAttribute('target', '_blank')
 
-    await act(async () =>
-      hook.onTokenRejected?.('You were removed from the session by the host'))
+    await act(async () => hook.onEnded?.({
+      reason: 'removed',
+      message: 'You were removed from the session by the host',
+    }))
 
     expect(await screen.findByText('You were removed from the session by the host'))
       .toBeInTheDocument()
@@ -77,16 +89,80 @@ describe('SessionPage', () => {
     expect(getStoredPlayer(SESSION_ID)).toBeNull()
   })
 
-  test('a later rejection without a reason keeps the notice', async () => {
+  test('a player who left stays on as a spectator', async () => {
     renderSessionPage()
     await screen.findByRole('button', { name: 'Leave' })
 
-    // Leaving, then the old connection's reconnect being rejected.
-    await act(async () => hook.onTokenRejected?.('You left the game.'))
-    await screen.findByText('You left the game.')
-    await act(async () => hook.onTokenRejected?.(null))
+    await act(async () => hook.onEnded?.({ reason: 'left' }))
 
-    expect(screen.getByText('You left the game.')).toBeInTheDocument()
+    expect(await screen.findByText('You left the game.')).toBeInTheDocument()
+    expect(screen.getByText(/You're watching as a spectator/)).toBeInTheDocument()
+    expect(getStoredPlayer(SESSION_ID)).toBeNull()
+  })
+
+  test('a second tab whose token another tab already forgot still moves on', async () => {
+    renderSessionPage()
+    await screen.findByRole('button', { name: 'Leave' })
+
+    // The other tab left first and forgot the shared token.
+    localStorage.removeItem(STORAGE_KEY)
+    await act(async () => hook.onEnded?.({
+      reason: 'removed',
+      message: 'You left the session',
+    }))
+
+    expect(await screen.findByText('You left the session')).toBeInTheDocument()
+    expect(screen.getByText(/You're watching as a spectator/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Buzz in' })).not.toBeInTheDocument()
+  })
+
+  test("keeps the token another tab joined again with", async () => {
+    renderSessionPage()
+    await screen.findByRole('button', { name: 'Leave' })
+
+    const rejoined = { playerId: 3, token: 'newer' }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rejoined))
+    await act(async () => hook.onEnded?.({
+      reason: 'removed',
+      message: 'You left the session',
+    }))
+
+    expect(getStoredPlayer(SESSION_ID)).toEqual(rejoined)
+  })
+
+  test('a token rejected on CONNECT offers to join again', async () => {
+    renderSessionPage()
+    await screen.findByRole('button', { name: 'Leave' })
+
+    await act(async () => hook.onEnded?.({
+      reason: 'rejected',
+      message: 'Unknown player token',
+    }))
+
+    expect(await screen.findByRole('button', { name: /Join this game/ }))
+      .toBeInTheDocument()
+    expect(screen.queryByText('Unknown player token')).not.toBeInTheDocument()
+    expect(getStoredPlayer(SESSION_ID)).toBeNull()
+  })
+
+  test('the last player leaving goes back to the live games', async () => {
+    renderSessionPage()
+    await screen.findByRole('button', { name: 'Leave' })
+
+    await act(async () => hook.onEnded?.({ reason: 'abandoned' }))
+
+    expect(await screen.findByText('Live games')).toBeInTheDocument()
+    expect(getStoredPlayer(SESSION_ID)).toBeNull()
+  })
+
+  test('a closed session forgets the token and stays on its final view', async () => {
+    renderSessionPage({ ...session, state: 'CLOSED', closeReason: 'FINISHED' })
+    await screen.findByText('This game has ended.')
+
+    await act(async () => hook.onEnded?.({ reason: 'closed' }))
+
+    expect(screen.getByText('This game has ended.')).toBeInTheDocument()
+    expect(getStoredPlayer(SESSION_ID)).toBeNull()
   })
 
   test.each([

@@ -2,8 +2,10 @@ import { Client } from '@stomp/stompjs'
 import { useEffect, useRef, useState } from 'react'
 import {
   getSession,
+  isLastPlayer,
   type GameSession,
   type GameSessionError,
+  type JoinedPlayer,
   type SessionTimers,
 } from '../api/sessions'
 import { ApiError, isServerOffline } from '../api/errors'
@@ -15,6 +17,25 @@ export type ConnectionStatus =
   | 'gone'
   // Neither the WebSocket nor the REST API can be reached.
   | 'offline'
+  // The connection is over for good: see SessionEnd.
+  | 'ended'
+
+// Why the connection ended for good. Every case but `closed` means the
+// player's token no longer works.
+export type SessionEnd =
+  // This player left.
+  | { reason: 'left' }
+  // This player left as the last one, which closes the session.
+  | { reason: 'abandoned' }
+  // The server closed the connection after a leave (e.g. in another tab) or
+  // a kick, and says which.
+  | { reason: 'removed', message: string | null }
+  // The server rejected the token on CONNECT, e.g. the session was lost in a
+  // backend restart.
+  | { reason: 'rejected', message: string | null }
+  // The session was removed (CLOSED): it sends nothing more, and would
+  // reject a reconnect.
+  | { reason: 'closed' }
 
 export interface SessionSnapshot {
   session: GameSession
@@ -56,9 +77,10 @@ function brokerUrl(sessionId: string): string {
  * `initial` is only read on mount: remount (with a `key`) to start over
  * from new loader data, e.g. when the token changes.
  *
- * `onTokenRejected` gets the server's reason when the player was connected
- * and then left or was kicked, and `null` when the token was rejected on
- * CONNECT (e.g. the session was lost in a backend restart).
+ * The hook alone decides when the connection is over for good (see
+ * `SessionEnd`): it stops the client, sets the status to `ended` and calls
+ * `onEnded`, at most once per mount. Leaving ends it right away, without
+ * waiting for the server's ERROR frame.
  *
  * When the WebSocket can't connect, the hook asks the REST API for the
  * session: if that can't be reached either, the server is switched off, so
@@ -66,10 +88,11 @@ function brokerUrl(sessionId: string): string {
  */
 export function useGameSession(
   initial: GameSession,
-  token: string | null,
-  onTokenRejected: (reason: string | null) => void,
+  player: JoinedPlayer | null,
+  onEnded: (ended: SessionEnd) => void,
 ) {
   const sessionId = initial.id
+  const token = player?.token ?? null
 
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(() => ({
     session: initial,
@@ -79,12 +102,26 @@ export function useGameSession(
   const [error, setError] = useState<GameSessionError | null>(null)
 
   const clientRef = useRef<Client | null>(null)
-  const onTokenRejectedRef = useRef(onTokenRejected)
+  // Stops the current client for good, so it isn't checked on anymore.
+  const stopRef = useRef<() => void>(() => {})
+  const endedRef = useRef(false)
+  const onEndedRef = useRef(onEnded)
   const errorTimerRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
-    onTokenRejectedRef.current = onTokenRejected
+    onEndedRef.current = onEnded
   })
+
+  function end(ended: SessionEnd) {
+    if (endedRef.current) {
+      return
+    }
+
+    endedRef.current = true
+    stopRef.current()
+    setStatus('ended')
+    onEndedRef.current(ended)
+  }
 
   function accept(next: GameSession) {
     setSnapshot(current =>
@@ -104,6 +141,11 @@ export function useGameSession(
   }
 
   useEffect(() => {
+    // Ended already (StrictMode runs effects twice): don't connect again.
+    if (endedRef.current) {
+      return
+    }
+
     let connected = false
     // Set once the client is shut down here, so it isn't checked on anymore.
     let stopped = false
@@ -163,7 +205,8 @@ export function useGameSession(
         getSession(sessionId)
           .then(accept)
           .catch(fetchError => {
-            if (fetchError instanceof ApiError && fetchError.status === 404) {
+            if (!stopped && fetchError instanceof ApiError &&
+              fetchError.status === 404) {
               setStatus('gone')
               stop()
             }
@@ -174,10 +217,10 @@ export function useGameSession(
       // rejects it on CONNECT, or closes the connection after a leave or kick.
       onStompError: frame => {
         if (token) {
-          stop()
-          onTokenRejectedRef.current(
-            connected ? frame.headers.message ?? null : null,
-          )
+          const message = frame.headers.message ?? null
+          end(connected
+            ? { reason: 'removed', message }
+            : { reason: 'rejected', message })
         }
       },
 
@@ -198,24 +241,39 @@ export function useGameSession(
     })
 
     clientRef.current = client
+    stopRef.current = stop
     client.activate()
 
     return () => {
       clientRef.current = null
+      stopRef.current = () => {}
       stop()
     }
   }, [sessionId, token])
 
-  // A closed session sends nothing more, and would reject a reconnect.
   const isClosed = snapshot.session.state === 'CLOSED'
 
+  // Every render: end() only acts once.
   useEffect(() => {
     if (isClosed) {
-      void clientRef.current?.deactivate()
+      end({ reason: 'closed' })
     }
-  }, [isClosed])
+  })
 
   useEffect(() => () => window.clearTimeout(errorTimerRef.current), [])
+
+  // No need to wait for the server's ERROR frame to say so. The last player
+  // leaving closes the session at once.
+  function leave(): boolean {
+    if (!player || !send('leave')) {
+      return false
+    }
+
+    end(isLastPlayer(snapshot.session, player.playerId)
+      ? { reason: 'abandoned' }
+      : { reason: 'left' })
+    return true
+  }
 
   function send(action: string, body?: object): boolean {
     const client = clientRef.current
@@ -250,7 +308,7 @@ export function useGameSession(
     updateTimers: timers => send('update-timers', timers),
     updateSettings: settings => send('update-settings', settings),
     kick: playerId => send('kick', { playerId }),
-    leave: () => send('leave'),
+    leave,
   }
 
   return { ...snapshot, status, error, actions }

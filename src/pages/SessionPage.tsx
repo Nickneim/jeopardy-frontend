@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Link,
   useLoaderData,
@@ -9,6 +9,7 @@ import {
 import {
   forgetPlayer,
   getStoredPlayer,
+  isLastPlayer,
   type GameSession,
   type GameSessionState,
   type JoinedPlayer,
@@ -33,7 +34,7 @@ import ShareLinkButton from '../components/session/ShareLinkButton'
 import StatusBar from '../components/session/StatusBar'
 import { ROUND_NAMES } from '../format'
 import { useCountdown } from '../hooks/useCountdown'
-import { useGameSession } from '../hooks/useGameSession'
+import { useGameSession, type SessionEnd } from '../hooks/useGameSession'
 import { linkedJoinMode, type JoinMode } from '../navigation'
 
 const CLUE_STATES = new Set<GameSessionState>([
@@ -74,32 +75,24 @@ interface LiveSessionProps {
   player: JoinedPlayer | null
   // How someone without a token starts out: choosing, joining or watching.
   joinMode: JoinMode
-  onTokenRejected: (reason: string | null) => void
+  onEnded: (ended: SessionEnd) => void
 }
 
 function LiveSession({
   initial,
   player,
   joinMode: initialJoinMode,
-  onTokenRejected,
+  onEnded,
 }: LiveSessionProps) {
   const { session, receivedAt, status, error, actions } = useGameSession(
     initial,
-    player?.token ?? null,
-    onTokenRejected,
+    player,
+    onEnded,
   )
-  const navigate = useNavigate()
   const [joinMode, setJoinMode] = useState<JoinMode>(initialJoinMode)
   const leftMs = useCountdown(session.phaseRemainingMs, receivedAt)
 
   const isClosed = session.state === 'CLOSED'
-
-  // A closed session's tokens no longer work.
-  useEffect(() => {
-    if (isClosed) {
-      forgetPlayer(session.id)
-    }
-  }, [isClosed, session.id])
 
   if (status === 'offline') {
     return <ServerOffline />
@@ -143,31 +136,13 @@ function LiveSession({
   const hostName = session.players
     .find(p => p.id === session.hostPlayerId)?.name ?? null
 
-  const isLastPlayer = !session.players
-    .some(p => p.id !== me?.id && !p.leaving)
   const isPlaying = session.state !== 'WAITING_FOR_START' &&
     session.state !== 'FINISHED_GAME'
-  const leaveQuestion = isLastPlayer
+  const leaveQuestion = isLastPlayer(session, me?.id)
     ? "You're the only player left, so leaving closes this game. Leave?"
     : isPlaying
       ? 'Leave the game? Your score will be lost.'
       : null
-
-  function leave() {
-    if (!actions.leave()) {
-      return
-    }
-
-    // The session closes at once, so there's nothing left to watch.
-    if (isLastPlayer) {
-      forgetPlayer(session.id)
-      navigate('/sessions')
-      return
-    }
-
-    // No need to wait for the server's ERROR frame to say so.
-    onTokenRejected('You left the game.')
-  }
 
   function kick(target: Player) {
     actions.kick(target.id)
@@ -216,7 +191,7 @@ function LiveSession({
         {state === 'WAITING_FOR_START' ? 'Live game' : ROUND_NAMES[session.round]}
       </h1>
 
-      {status !== 'connected' && (
+      {(status === 'connecting' || status === 'reconnecting') && (
         <p className="tv-strip connection-status" role="status">
           {STATUS_MESSAGES[status]}
         </p>
@@ -346,7 +321,7 @@ function LiveSession({
                 confirmLabel="Yes, leave"
                 className="tv-action"
                 disabled={!isConnected}
-                onConfirm={leave}
+                onConfirm={actions.leave}
               />
             )}
           </>
@@ -360,18 +335,39 @@ function SessionPage() {
   const { session, player } = useLoaderData() as SessionLoaderData
   const revalidator = useRevalidator()
   const location = useLocation()
+  const navigate = useNavigate()
   // Why the player's token stopped working, e.g. "You left the session".
   const [notice, setNotice] = useState<string | null>(null)
 
-  function handleTokenRejected(reason: string | null) {
-    // Already handled: e.g. after a leave, the old connection's reconnect is
-    // rejected too, and mustn't replace the notice with nothing.
-    if (!getStoredPlayer(session.id)) {
-      return
+  // The live connection ended for good, so its token no longer works. Every
+  // tab sharing the token gets here: each forgets it (unless another tab
+  // already joined again with a new one) and reloads to show what's next.
+  function handleEnded(ended: SessionEnd) {
+    if (getStoredPlayer(session.id)?.token === player?.token) {
+      forgetPlayer(session.id)
     }
 
-    forgetPlayer(session.id)
-    setNotice(reason)
+    switch (ended.reason) {
+      // The page shows the closed session as it is.
+      case 'closed':
+        return
+      // The session closes at once, so there's nothing left to watch.
+      case 'abandoned':
+        navigate('/sessions')
+        return
+      case 'left':
+        setNotice('You left the game.')
+        break
+      case 'removed':
+        setNotice(ended.message)
+        break
+      // "Unknown player token" means nothing to the player: just offer to
+      // join again.
+      case 'rejected':
+        setNotice(null)
+        break
+    }
+
     void revalidator.revalidate()
   }
 
@@ -392,12 +388,12 @@ function SessionPage() {
         <p className="session-notice" role="status">{notice}</p>
       )}
 
-        <LiveSession
+      <LiveSession
         key={`${session.id}:${player?.token ?? 'watcher'}`}
         initial={session}
         player={player}
         joinMode={joinMode}
-        onTokenRejected={handleTokenRejected}
+        onEnded={handleEnded}
       />
     </>
   )

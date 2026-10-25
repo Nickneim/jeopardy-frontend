@@ -193,6 +193,15 @@ export function clueAnswersRound(session: GameSession): GameRound {
     : session.round
 }
 
+// Whether nobody else is still playing, so this player leaving closes the
+// session.
+export function isLastPlayer(
+  session: GameSession,
+  playerId: number | undefined,
+): boolean {
+  return !session.players.some(p => p.id !== playerId && !p.leaving)
+}
+
 export interface GameSessionError {
   code: GameErrorCode
   message: string

@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getSession, type GameSession } from '../api/sessions'
 import { ApiError } from '../api/errors'
-import { makeSession, SESSION_ID } from '../test/fixtures'
+import { makePlayer, makeSession, SESSION_ID } from '../test/fixtures'
 import { useGameSession } from './useGameSession'
 
 // A stand-in for @stomp/stompjs's Client: tests drive its callbacks.
@@ -58,6 +58,7 @@ vi.mock('../api/sessions', async importOriginal => ({
 }))
 
 const TOPIC = `/topic/sessions/${SESSION_ID}`
+const PLAYER = { playerId: 2, token: 'secret' }
 
 function lastClient(): FakeClient {
   return clients[clients.length - 1]
@@ -84,7 +85,7 @@ beforeEach(() => {
 
 describe('useGameSession', () => {
   test('connects with the token in the CONNECT header, and none to watch', () => {
-    renderHook(() => useGameSession(makeSession(), 'secret', () => {}))
+    renderHook(() => useGameSession(makeSession(), PLAYER, () => {}))
     expect(lastClient().config.connectHeaders).toEqual({ 'player-token': 'secret' })
 
     renderHook(() => useGameSession(makeSession(), null, () => {}))
@@ -176,52 +177,101 @@ describe('useGameSession', () => {
     expect(getSession).not.toHaveBeenCalled()
   })
 
-  test('a token rejected on CONNECT is reported without a reason', () => {
-    const onTokenRejected = vi.fn()
-    renderHook(() => useGameSession(makeSession(), 'secret', onTokenRejected))
+  test('a token rejected on CONNECT ends the session as rejected', () => {
+    const onEnded = vi.fn()
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), PLAYER, onEnded))
 
     act(() => lastClient().config.onStompError({
       headers: { message: 'Unknown player token' },
     }))
 
-    expect(onTokenRejected).toHaveBeenCalledWith(null)
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({
+      reason: 'rejected',
+      message: 'Unknown player token',
+    })
     expect(lastClient().deactivated).toBe(true)
+    expect(result.current.status).toBe('ended')
   })
 
-  test('an ERROR after connecting (left or kicked) passes on its reason', () => {
-    const onTokenRejected = vi.fn()
-    renderHook(() => useGameSession(makeSession(), 'secret', onTokenRejected))
+  test('an ERROR after connecting (left or kicked) ends it with its reason', () => {
+    const onEnded = vi.fn()
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), PLAYER, onEnded))
 
     connect()
     act(() => lastClient().config.onStompError({
       headers: { message: 'You were removed from the session by the host' },
     }))
+    // The WebSocket closes right after the ERROR frame.
+    act(() => lastClient().config.onWebSocketClose())
 
-    expect(onTokenRejected)
-      .toHaveBeenCalledWith('You were removed from the session by the host')
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({
+      reason: 'removed',
+      message: 'You were removed from the session by the host',
+    })
+    expect(lastClient().deactivated).toBe(true)
+    expect(result.current.status).toBe('ended')
   })
 
   test('ignores ERROR frames on a watcher connection', () => {
-    const onTokenRejected = vi.fn()
-    renderHook(() => useGameSession(makeSession(), null, onTokenRejected))
+    const onEnded = vi.fn()
+    renderHook(() => useGameSession(makeSession(), null, onEnded))
 
     act(() => lastClient().config.onStompError({ headers: {} }))
 
-    expect(onTokenRejected).not.toHaveBeenCalled()
+    expect(onEnded).not.toHaveBeenCalled()
   })
 
-  test('stops reconnecting once the session is closed', () => {
-    renderHook(() => useGameSession(makeSession(), 'secret', () => {}))
+  test('stops reconnecting once the session is closed, and says so once', () => {
+    const onEnded = vi.fn()
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), PLAYER, onEnded))
 
     connect()
     broadcast(makeSession({ version: 1, state: 'CLOSED', closeReason: 'ABANDONED' }))
+    broadcast(makeSession({ version: 2, state: 'CLOSED', closeReason: 'ABANDONED' }))
 
     expect(lastClient().deactivated).toBe(true)
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({ reason: 'closed' })
+    expect(result.current.status).toBe('ended')
+  })
+
+  test('leaving ends it at once, and the ERROR that follows is ignored', () => {
+    const onEnded = vi.fn()
+    const players = [makePlayer({ id: 1 }), makePlayer({ id: 2, name: 'Bob' })]
+    const { result } = renderHook(() =>
+      useGameSession(makeSession({ players }), PLAYER, onEnded))
+
+    connect()
+    act(() => { result.current.actions.leave() })
+    act(() => lastClient().config.onStompError({
+      headers: { message: 'You left the session' },
+    }))
+
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({ reason: 'left' })
+    expect(lastClient().deactivated).toBe(true)
+    expect(result.current.status).toBe('ended')
+  })
+
+  test('the last player leaving abandons the session', () => {
+    const onEnded = vi.fn()
+    const players = [
+      makePlayer({ id: 1, leaving: true }),
+      makePlayer({ id: 2, name: 'Bob' }),
+    ]
+    const { result } = renderHook(() =>
+      useGameSession(makeSession({ players }), PLAYER, onEnded))
+
+    connect()
+    act(() => { result.current.actions.leave() })
+
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({ reason: 'abandoned' })
   })
 
   test('sends actions to the session, and leave says whether it was sent', () => {
     const { result } = renderHook(() =>
-      useGameSession(makeSession(), 'secret', () => {}))
+      useGameSession(makeSession(), PLAYER, () => {}))
 
     let sent: boolean | undefined
     act(() => { sent = result.current.actions.leave() })
