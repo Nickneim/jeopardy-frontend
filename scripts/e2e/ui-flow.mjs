@@ -124,6 +124,17 @@ async function newPlayer(name) {
     if (!el) throw new Error('No button or link: ' + ${JSON.stringify(label)})
     el.click()
   })()`)
+  // A link by its exact text and target, such as a session's Join or Watch on
+  // the live games list.
+  page.clickLink = async (label, href, ms = 5000) => {
+    const find = `[...document.querySelectorAll('a')].find(a => a.textContent === ${JSON.stringify(label)} && a.href === ${JSON.stringify(href)})`
+    const end = Date.now() + ms
+    while (Date.now() < end) {
+      if (await page.eval(`(() => { const a = ${find}; a?.click(); return !!a })()`)) return
+      await sleep(100)
+    }
+    throw new Error(`No ${label} link to ${href}`)
+  }
   page.join = async playerName => {
     await page.eval(`document.querySelector('input[name=playerName]').value = ${JSON.stringify(playerName)}`)
     await page.click('Join game')
@@ -163,7 +174,7 @@ try {
   await bob.goto(`${APP}/sessions`)
   check('live games list shows the session hosted by Alice with Join',
     await bob.waitText('hosted by Alice') && (await bob.text()).includes('Join'))
-  await bob.eval(`[...document.querySelectorAll('a')].find(a => a.textContent === 'Join' && a.href === ${JSON.stringify(sessionUrl)}).click()`)
+  await bob.clickLink('Join', sessionUrl)
   check('Join link opens the session', await bob.waitText('Your name'))
   await bob.join('Bob')
   check('non-host sees waiting message and read-only timers',
@@ -204,6 +215,9 @@ try {
   await carol.click('Join with a code')
   check('an unknown code is explained on the form',
     await carol.waitText('no live game with the code ZZZZZ'))
+  // The error shows while the page still revalidates after the action, with
+  // the button reading "Opening…", so wait for it to be back.
+  await carol.waitText('Join with a code')
   await carol.eval(`document.querySelector('input[name=code]').value = ${JSON.stringify(code.toLowerCase())}`)
   await carol.click('Join with a code')
   check('a code typed in lowercase opens the session',
@@ -282,7 +296,7 @@ try {
   const url2 = await alice.eval('location.href')
   await frank.goto(`${APP}/sessions`)
   await frank.waitText('hosted by Alice')
-  await frank.eval(`[...document.querySelectorAll('a')].find(a => a.textContent === 'Watch' && a.href === ${JSON.stringify(url2)}).click()`)
+  await frank.clickLink('Watch', url2)
   check('list Watch link opens in spectator mode, game visible',
     await frank.waitText("You're watching as a spectator") &&
     await frank.waitText('Alice is choosing a clue'),
