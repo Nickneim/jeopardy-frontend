@@ -53,7 +53,7 @@ export async function preflight() {
   try {
     await fetch(APP)
   } catch {
-    console.error(`No dev server at ${APP}. Start it with: npm run dev`)
+    console.error(`No dev server at ${APP}. Start it with: pnpm dev`)
     process.exit(2)
   }
 

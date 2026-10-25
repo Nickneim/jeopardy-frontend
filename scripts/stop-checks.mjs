@@ -24,7 +24,7 @@ const ROOT = realpathSync.native(join(dirname(fileURLToPath(import.meta.url)), '
 const WATCHED_DIRS = ['src', 'scripts']
 const WATCHED_FILES = [
   'package.json',
-  'package-lock.json',
+  'pnpm-lock.yaml',
   'vite.config.ts',
   'tsconfig.json',
   'tsconfig.app.json',
@@ -84,7 +84,7 @@ if (readState().fingerprint === current) {
 
 let failure = null
 for (const check of CHECKS) {
-  const result = spawnSync(`npm run ${check}`, {
+  const result = spawnSync(`pnpm run ${check}`, {
     cwd: ROOT,
     shell: true,
     encoding: 'utf8',
@@ -108,7 +108,7 @@ if (!failure) {
   process.exit(0)
 }
 
-const message = `\`npm run ${failure.check}\` failed:\n\n${failure.output}`
+const message = `\`pnpm run ${failure.check}\` failed:\n\n${failure.output}`
 
 console.log(JSON.stringify(input.stop_hook_active
   ? { systemMessage: `Stop checks still failing. ${message}` }

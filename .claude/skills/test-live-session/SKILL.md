@@ -5,20 +5,20 @@ description: Run the end-to-end checks for live game sessions against the real b
 
 # Test live game sessions end to end
 
-`npm test` covers the pieces in isolation. These scripts cover the whole system: the browser, the Vite proxy and the real backend. They live in `scripts/e2e/` and are plain Node scripts, not a framework.
+`pnpm test` covers the pieces in isolation. These scripts cover the whole system: the browser, the Vite proxy and the real backend. They live in `scripts/e2e/` and are plain Node scripts, not a framework.
 
 | Script | What it does | Time |
 |---|---|---|
 | `scripts/e2e/session-flow.mjs` | Real STOMP clients play the rules: host, `NOT_HOST`, timers and their bounds, `update-settings`, kick, a `409` for late joins, leave, host handover, a leaving chooser, `CLOSED` and the 404 after it | ~10 s |
 | `scripts/e2e/ui-flow.mjs` | Headless Chrome, one isolated browser context per player (own `localStorage`): hosting from a game page, the live games list, timers, late joining, watch or join, kick, leave, the closed view, a spectator joining mid-game, and no console errors | ~1 min |
 
-`npm run e2e` runs both, protocol first.
+`pnpm e2e` runs both, protocol first.
 
 ## Steps
 
 1. **Backend.** `curl -s -m 3 http://localhost:8080/api/game-sessions` must answer (or, when the dev server runs with `BACKEND_URL`, that address instead, e.g. `http://localhost` for the Kubernetes Ingress). If it doesn't, ask the user to start it from `../backend`. Don't start it yourself, because it needs their database environment variables.
-2. **Dev server.** If `http://localhost:5173` doesn't answer, start `npm run dev` in the background. Stop it at the end only if you started it.
-3. **Run** `npm run e2e`, or one script with `node scripts/e2e/<script>`. To save tokens, filter the output to what matters: `npm run e2e 2>&1 | grep -E "^FAIL|checks? (passed|failed)|Screenshots"`. Show the full output only when something fails.
+2. **Dev server.** If `http://localhost:5173` doesn't answer, start `pnpm dev` in the background. Stop it at the end only if you started it.
+3. **Run** `pnpm e2e`, or one script with `node scripts/e2e/<script>`. To save tokens, filter the output to what matters: `pnpm e2e 2>&1 | grep -E "^FAIL|checks? (passed|failed)|Screenshots"`. Show the full output only when something fails.
 4. **Screenshots.** `ui-flow.mjs` saves PNGs (host and player lobby, the closed view, the join choice, joining mid-game) to the folder it prints at the end. Look at them when the change is visual.
 
 Settings, all optional: `GAME_ID` picks the game (default: the first playable one), `CHROME` the browser path (default: Chrome or Edge in the usual places), `OUT_DIR` the screenshot folder, `APP_URL` the dev server.

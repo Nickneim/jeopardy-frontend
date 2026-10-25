@@ -11,14 +11,17 @@ The **backend** is a separate Spring Boot repository in the sibling folder `../b
 ## Commands
 
 ```bash
-npm run dev       # Vite dev server on http://localhost:5173
-npm run build     # type-check (tsc -b) + production build
-npm run lint      # ESLint
-npm test          # Vitest, once (npm run test:watch to rerun on save)
-npm run preview   # serve the production build
+pnpm install      # dependencies (run it first in a new worktree)
+pnpm dev          # Vite dev server on http://localhost:5173
+pnpm build        # type-check (tsc -b) + production build
+pnpm lint         # ESLint
+pnpm test         # Vitest, once (pnpm test:watch to rerun on save)
+pnpm preview      # serve the production build
 ```
 
-`npm run build` is also the type check, and it covers the test files.
+`pnpm build` is also the type check, and it covers the test files.
+
+The package manager is **pnpm** (version pinned by `packageManager` in `package.json`, run through corepack), not npm: don't create a `package-lock.json`. pnpm hard-links packages from one shared store, so installing in each git worktree is fast and takes almost no disk space. Its `node_modules` only exposes declared dependencies, so add a package to `package.json` (`pnpm add`) before importing it.
 
 ### Tests
 
@@ -29,13 +32,13 @@ Vitest with jsdom and React Testing Library, configured in the `test` block of `
 
 ### End-to-end checks and the Stop hook
 
-- `npm run e2e` runs `scripts/e2e/` against the real backend through the dev server (both must be running): real STOMP clients play the session rules, then headless Chrome plays a whole game with several players. The `test-live-session` skill (`.claude/skills/`) says when and how to run them.
+- `pnpm e2e` runs `scripts/e2e/` against the real backend through the dev server (both must be running): real STOMP clients play the session rules, then headless Chrome plays a whole game with several players. The `test-live-session` skill (`.claude/skills/`) says when and how to run them.
 - `.claude/settings.json` has a Stop hook, `scripts/stop-checks.mjs`, that runs build, lint and tests at the end of a turn when `src/`, `scripts/` or a config file changed since its last run. It's silent when they pass and hands failures back to Claude. Its state is in `node_modules/.cache/claude-stop-checks.json`: delete it to force a rerun.
 
 ### Running against the backend
 
 - The backend runs on `http://localhost:8080` (start it from `../backend`; see its CLAUDE.md for the database environment variables).
-- `vite.config.ts` proxies `/api` and `/ws` to the backend, so the frontend always uses relative `/api/...` and `/ws` URLs. The target is `BACKEND_URL`, default `http://localhost:8080`. The backend's Kubernetes setup (`../backend/k8s/README.md`) serves both through an Ingress on port 80: start the dev server with `BACKEND_URL=http://localhost` (in PowerShell, `$env:BACKEND_URL='http://localhost'; npm run dev`).
+- `vite.config.ts` proxies `/api` and `/ws` to the backend, so the frontend always uses relative `/api/...` and `/ws` URLs. The target is `BACKEND_URL`, default `http://localhost:8080`. The backend's Kubernetes setup (`../backend/k8s/README.md`) serves both through an Ingress on port 80: start the dev server with `BACKEND_URL=http://localhost` (in PowerShell, `$env:BACKEND_URL='http://localhost'; pnpm dev`).
 
 ## Architecture
 
