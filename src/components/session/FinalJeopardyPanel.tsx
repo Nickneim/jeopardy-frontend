@@ -7,6 +7,7 @@ import {
   type SentFinalJeopardy,
 } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
+import { sanitizeClueHtml } from '../../clueHtml'
 import { formatMoney } from '../../format'
 import AnswerForm from './AnswerForm'
 import CorrectResponse from './CorrectResponse'
@@ -92,7 +93,7 @@ function FinalJeopardyPanel({
         <div className={isRevealing ? 'tv-question-box is-small' : 'tv-question-box'}>
           <p
             className="tv-question"
-            dangerouslySetInnerHTML={{ __html: final.question }}
+            dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(final.question) }}
           />
         </div>
       )}

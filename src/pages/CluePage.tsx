@@ -2,6 +2,7 @@ import { Link, useLoaderData, useLocation } from 'react-router'
 import type { Clue } from '../api/clues'
 import ClueMedia from '../components/ClueMedia'
 import { formatCorrectResponse } from '../format'
+import { sanitizeClueHtml } from '../clueHtml'
 
 function CluePage() {
   const clue = useLoaderData() as Clue
@@ -33,7 +34,7 @@ function CluePage() {
 
       <div
         className="clue-question"
-        dangerouslySetInnerHTML={{ __html: clue.question }}
+        dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(clue.question) }}
       />
 
       <details>

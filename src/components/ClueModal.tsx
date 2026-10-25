@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router'
 import type { GameCategory, GameClue } from '../api/games'
+import { sanitizeClueHtml } from '../clueHtml'
 import { formatCorrectResponse } from '../format'
 import ClueMedia from './ClueMedia'
 
@@ -48,7 +49,7 @@ function ClueModal({
 
           <p
             className="clue-question"
-            dangerouslySetInnerHTML={{ __html: clue.question }}
+            dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(clue.question) }}
           />
 
           <details>

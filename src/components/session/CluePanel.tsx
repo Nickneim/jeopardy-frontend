@@ -1,5 +1,6 @@
 import { clueAnswersRound, type GameSession, type Player } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
+import { sanitizeClueHtml } from '../../clueHtml'
 import { formatMoney } from '../../format'
 import ClueMedia from '../ClueMedia'
 import AnswerForm from './AnswerForm'
@@ -109,7 +110,7 @@ function CluePanel({
               >
                 <p
                   className="tv-question"
-                  dangerouslySetInnerHTML={{ __html: clue.question }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(clue.question) }}
                 />
               </div>
             )}
