@@ -10,6 +10,7 @@ interface FakeClient {
   config: {
     brokerURL: string
     connectHeaders: Record<string, string>
+    heartbeatStrategy: string
     onConnect: () => void
     onStompError: (frame: { headers: Record<string, string> }) => void
     onWebSocketClose: () => void
@@ -23,6 +24,7 @@ interface FakeClient {
 const { clients } = vi.hoisted(() => ({ clients: [] as FakeClient[] }))
 
 vi.mock('@stomp/stompjs', () => ({
+  TickerStrategy: { Interval: 'interval', Worker: 'worker' },
   Client: class {
     config: FakeClient['config']
     connected = false
@@ -96,6 +98,11 @@ describe('useGameSession', () => {
     renderHook(() => useGameSession(makeSession(), null, () => {}))
     expect(lastClient().config.brokerURL)
       .toBe(`ws://${window.location.host}/ws?session=${SESSION_ID}`)
+  })
+
+  test('sends heartbeats from a Web Worker, which a hidden tab keeps running', () => {
+    renderHook(() => useGameSession(makeSession(), PLAYER, () => {}))
+    expect(lastClient().config.heartbeatStrategy).toBe('worker')
   })
 
   test('keeps the snapshot with the highest version', () => {

@@ -1,4 +1,4 @@
-import { Client } from '@stomp/stompjs'
+import { Client, TickerStrategy } from '@stomp/stompjs'
 import { useEffect, useRef, useState } from 'react'
 import {
   getSession,
@@ -186,6 +186,10 @@ export function useGameSession(
       brokerURL: brokerUrl(sessionId),
       connectHeaders: token ? { 'player-token': token } : {},
       reconnectDelay: 2000,
+      // A background tab throttles its timers, and the server drops a
+      // connection that misses its heartbeats. A Web Worker's timers keep
+      // running, so the player doesn't go away while the tab is hidden.
+      heartbeatStrategy: TickerStrategy.Worker,
 
       onConnect: () => {
         connected = true
