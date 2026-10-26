@@ -134,16 +134,74 @@ describe('useGameSession', () => {
     expect(result.current.session.version).toBe(5)
   })
 
-  test('reports a session that no longer exists as gone', async () => {
-    vi.mocked(getSession).mockRejectedValue(new ApiError(404, 'Not found'))
+  test('a session that no longer exists ends it as gone', async () => {
+    vi.mocked(getSession).mockRejectedValue(
+      new ApiError(404, 'Game session not found', 'SESSION_NOT_FOUND'))
+    const onEnded = vi.fn()
 
     const { result } = renderHook(() =>
-      useGameSession(makeSession(), null, () => {}))
+      useGameSession(makeSession(), PLAYER, onEnded))
 
     connect()
 
-    await waitFor(() => expect(result.current.status).toBe('gone'))
+    await waitFor(() => expect(result.current.status).toBe('ended'))
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({ reason: 'gone' })
     expect(lastClient().deactivated).toBe(true)
+  })
+
+  test('a session missing while reconnecting ends it as gone', async () => {
+    vi.mocked(getSession).mockRejectedValue(
+      new ApiError(404, 'Game session not found', 'SESSION_NOT_FOUND'))
+    const onEnded = vi.fn()
+
+    renderHook(() => useGameSession(makeSession(), PLAYER, onEnded))
+    act(() => lastClient().config.onWebSocketClose())
+
+    await waitFor(() =>
+      expect(onEnded).toHaveBeenCalledExactlyOnceWith({ reason: 'gone' }))
+  })
+
+  test('a 404 without SESSION_NOT_FOUND (a proxy, say) keeps the session', async () => {
+    vi.mocked(getSession).mockRejectedValue(new ApiError(404, 'Not found'))
+    const onEnded = vi.fn()
+
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), PLAYER, onEnded))
+
+    connect()
+
+    await waitFor(() => expect(getSession).toHaveBeenCalled())
+    expect(onEnded).not.toHaveBeenCalled()
+    expect(result.current.status).toBe('connected')
+  })
+
+  test('keeps the same actions across renders', () => {
+    const { result, rerender } = renderHook(() =>
+      useGameSession(makeSession(), PLAYER, () => {}))
+
+    const first = result.current.actions
+    connect()
+    broadcast(makeSession({ version: 2 }))
+    rerender()
+
+    expect(result.current.actions).toBe(first)
+  })
+
+  test('leave reads the latest snapshot to tell the last player', () => {
+    const onEnded = vi.fn()
+    const players = [makePlayer({ id: 1 }), makePlayer({ id: 2, name: 'Bob' })]
+    const { result } = renderHook(() =>
+      useGameSession(makeSession({ version: 1, players }), PLAYER, onEnded))
+
+    connect()
+    // Player 1 has left since the first snapshot.
+    broadcast(makeSession({
+      version: 2,
+      players: [makePlayer({ id: 1, leaving: true }), players[1]],
+    }))
+    act(() => { result.current.actions.leave() })
+
+    expect(onEnded).toHaveBeenCalledExactlyOnceWith({ reason: 'abandoned' })
   })
 
   test('reports the server offline when neither the WebSocket nor the API answers', async () => {

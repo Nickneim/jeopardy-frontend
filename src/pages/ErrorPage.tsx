@@ -3,7 +3,7 @@ import {
   Link,
   useRouteError,
 } from 'react-router'
-import { ApiError, isServerOffline } from '../api/errors'
+import { ApiError, hasErrorCode, isServerOffline } from '../api/errors'
 import ServerOffline from '../components/ServerOffline'
 
 function ErrorPage() {
@@ -11,6 +11,23 @@ function ErrorPage() {
 
   if (isServerOffline(error)) {
     return <ServerOffline />
+  }
+
+  // An old invite link, or a game that ended while the page was open.
+  if (hasErrorCode(error, 'SESSION_NOT_FOUND')) {
+    return (
+      <main>
+        <h1>Game over</h1>
+
+        <p>This game has ended, or there's no game with this code.</p>
+
+        <p>
+          <Link to="/sessions">See the live games</Link>
+          {' · '}
+          <Link to="/games">Pick a game to host</Link>
+        </p>
+      </main>
+    )
   }
 
   let message = 'An unexpected error occurred.'

@@ -99,16 +99,6 @@ function LiveSession({
     return <ServerOffline />
   }
 
-  if (status === 'gone') {
-    return (
-      <main>
-        <h1>Game over</h1>
-        <p>This game session no longer exists.</p>
-        <Link to="/games">Browse games</Link>
-      </main>
-    )
-  }
-
   if (isClosed) {
     return (
       <main className="live-session tv-stage">
@@ -367,6 +357,9 @@ function SessionPage() {
       // join again.
       case 'rejected':
         setNotice(null)
+        break
+      // Reloading finds no session, so the error page says the game ended.
+      case 'gone':
         break
     }
 

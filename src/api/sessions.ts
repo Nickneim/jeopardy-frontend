@@ -7,6 +7,7 @@ import { get, post, put } from './client'
 import type { ClueType } from './clues'
 import { hasErrorCode } from './errors'
 import type { PageResponse } from './games'
+import { pageParam, redirectPastLastPage } from './paging'
 import { normalizeSessionCode, randomSessionCode } from '../sessionCode'
 
 export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
@@ -62,6 +63,14 @@ export const MAX_ANSWER_LENGTH = 200
 
 export function textLength(text: string): number {
   return [...text].length
+}
+
+// A name as the backend cleans it before checking it: spaces and zero-width
+// spaces (U+200B, U+2060, U+FEFF) removed at both ends.
+const NAME_EDGES = /^[\s\u200B\u2060\uFEFF]+|[\s\u200B\u2060\uFEFF]+$/g
+
+export function cleanPlayerName(name: string): string {
+  return name.replace(NAME_EDGES, '')
 }
 
 // Phase durations in milliseconds.
@@ -431,17 +440,7 @@ export async function sessionsLoader({
   request,
 }: LoaderFunctionArgs): Promise<PageResponse<GameSessionSummary>> {
   const url = new URL(request.url)
-  const pageParam = url.searchParams.get('page')
-
-  const page = pageParam === null
-    ? 0
-    : Number(pageParam)
-
-  if (!Number.isInteger(page) || page < 0) {
-    throw new Response('Invalid page parameter', {
-      status: 400,
-    })
-  }
+  const page = pageParam(url)
 
   const sessions = await getSessions(
     page,
@@ -449,11 +448,7 @@ export async function sessionsLoader({
     url.searchParams.get('finished') === 'true',
   )
 
-  // Past the last page (e.g. sessions closed since): go to the last page.
-  if (sessions.totalPages > 0 && page >= sessions.totalPages) {
-    url.searchParams.set('page', String(sessions.totalPages - 1))
-    throw redirect(`${url.pathname}?${url.searchParams}`)
-  }
+  redirectPastLastPage(url, page, sessions.totalPages)
 
   return sessions
 }
@@ -507,7 +502,9 @@ async function createSessionAction({
 }: ActionFunctionArgs): Promise<JoinActionData | Response> {
   const formData = await request.formData()
   const gameId = Number(formData.get('gameId'))
-  const playerName = String(formData.get('playerName') ?? '').trim()
+  // Checked like the backend will, before the session exists: a name it
+  // rejects would leave an empty session behind.
+  const playerName = cleanPlayerName(String(formData.get('playerName') ?? ''))
 
   if (!Number.isInteger(gameId) || gameId <= 0) {
     throw new Response('Invalid game ID', {
@@ -557,7 +554,9 @@ async function openByCode(typed: string): Promise<JoinActionData | Response> {
     return { error: "Enter the game's code." }
   }
 
-  const code = normalizeSessionCode(typed)
+  // A pasted share link works too.
+  const linked = /\/sessions\/([^/?#\s]+)/.exec(typed)
+  const code = normalizeSessionCode(linked ? linked[1] : typed)
 
   if (!code) {
     return { error: 'A game code is 5 letters and digits, such as 7KQ2M.' }
@@ -582,7 +581,7 @@ export async function joinSessionAction({
 }: ActionFunctionArgs): Promise<JoinActionData | Response> {
   const id = sessionCodeParam(params.id)
   const formData = await request.formData()
-  const playerName = String(formData.get('playerName') ?? '').trim()
+  const playerName = cleanPlayerName(String(formData.get('playerName') ?? ''))
 
   if (!playerName) {
     return { error: 'Enter a name to join.' }

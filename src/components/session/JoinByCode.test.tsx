@@ -35,6 +35,18 @@ describe('JoinByCode', () => {
     expect(action).toHaveBeenCalledWith('7kq2m')
   })
 
+  test('sends a pasted share link whole, for the action to read', async () => {
+    const action = vi.fn(() => redirect('/sessions/7KQ2M'))
+    renderForm(action)
+
+    await userEvent.click(screen.getByRole('textbox', { name: 'Game code' }))
+    await userEvent.paste(' https://jeopardy.example/sessions/7KQ2M')
+    await userEvent.click(screen.getByRole('button', { name: 'Join with a code' }))
+
+    expect(await screen.findByText('Session page')).toBeInTheDocument()
+    expect(action).toHaveBeenCalledWith(' https://jeopardy.example/sessions/7KQ2M')
+  })
+
   test("shows why the code didn't work", async () => {
     renderForm(() => ({ error: "There's no live game with the code 7KQ2M." }))
 

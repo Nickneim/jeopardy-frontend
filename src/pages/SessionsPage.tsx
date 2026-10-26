@@ -7,6 +7,7 @@ import {
 } from 'react-router'
 import type { PageResponse } from '../api/games'
 import type { GameSessionSummary } from '../api/sessions'
+import Pagination from '../components/Pagination'
 import JoinByCode from '../components/session/JoinByCode'
 import { formatMoney, ROUND_NAMES } from '../format'
 import type { SessionLinkState } from '../navigation'
@@ -32,22 +33,10 @@ function SessionsPage() {
   const revalidator = useRevalidator()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const page = sessions.page
   const showFinished = searchParams.get('finished') === 'true'
   const isLoading = navigation.state !== 'idle' ||
     revalidator.state !== 'idle'
 
-  function goToPage(newPage: number) {
-    const newParams = new URLSearchParams(searchParams)
-
-    if (newPage === 0) {
-      newParams.delete('page')
-    } else {
-      newParams.set('page', String(newPage))
-    }
-
-    setSearchParams(newParams)
-  }
 
   // Back to the first page, since the list changes.
   function toggleFinished(show: boolean) {
@@ -119,30 +108,12 @@ function SessionsPage() {
         </article>
       ))}
 
-      {sessions.totalPages > 1 && (
-        <nav aria-label="Live game pagination">
-          <button
-            type="button"
-            disabled={isLoading || page === 0}
-            onClick={() => goToPage(page - 1)}
-          >
-            Previous
-          </button>
-
-          <span>
-            {' '}
-            Page {page + 1} of {sessions.totalPages}{' '}
-          </span>
-
-          <button
-            type="button"
-            disabled={isLoading || page >= sessions.totalPages - 1}
-            onClick={() => goToPage(page + 1)}
-          >
-            Next
-          </button>
-        </nav>
-      )}
+      <Pagination
+        page={sessions.page}
+        totalPages={sessions.totalPages}
+        disabled={isLoading}
+        label="Live game pagination"
+      />
     </main>
   )
 }

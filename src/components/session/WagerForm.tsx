@@ -4,9 +4,13 @@ import { formatMoney } from '../../format'
 interface WagerFormProps {
   min: number
   max: number
+  // What the field starts with (a wager already placed), `min` by default.
+  initialWager?: number | null
   submitLabel: string
   // Adds a button that wagers the most allowed (a "true Daily Double").
   allIn?: boolean
+  // Sends only once: a second click would just get an error back.
+  once?: boolean
   // Said under the field, after the allowed range.
   note?: string
   onSubmit: (wager: number) => void
@@ -15,18 +19,30 @@ interface WagerFormProps {
 function WagerForm({
   min,
   max,
+  initialWager = null,
   submitLabel,
   allIn = false,
+  once = false,
   note,
   onSubmit,
 }: WagerFormProps) {
-  const [wager, setWager] = useState(String(min))
+  const [wager, setWager] = useState(String(initialWager ?? min))
+  const [sent, setSent] = useState(false)
   const inputId = useId()
   const hintId = useId()
 
+  const isLocked = once && sent
+
+  function send(value: number) {
+    if (!isLocked) {
+      setSent(true)
+      onSubmit(value)
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onSubmit(Number(wager))
+    send(Number(wager))
   }
 
   return (
@@ -45,6 +61,7 @@ function WagerForm({
             step={1}
             value={wager}
             onChange={event => setWager(event.target.value)}
+            readOnly={isLocked}
             aria-describedby={hintId}
             autoFocus
           />
@@ -54,16 +71,17 @@ function WagerForm({
           <button
             type="button"
             className="is-secondary"
+            disabled={isLocked}
             onClick={() => {
               setWager(String(max))
-              onSubmit(max)
+              send(max)
             }}
           >
             All in · {formatMoney(max)}
           </button>
         )}
 
-        <button type="submit">{submitLabel}</button>
+        <button type="submit" disabled={isLocked}>{submitLabel}</button>
       </div>
 
       <p id={hintId} className="tv-form-hint">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   getSentFinalJeopardy,
   rememberSentFinalJeopardy,
@@ -39,6 +39,12 @@ function FinalJeopardyPanel({
   const myAnswer = sent.answer
 
   const final = session.finalJeopardy
+  const question = final?.question ?? null
+  // The page re-renders with every countdown tick: clean the HTML once.
+  const questionHtml = useMemo(
+    () => question && sanitizeClueHtml(question),
+    [question],
+  )
 
   if (!final) {
     return null
@@ -92,11 +98,11 @@ function FinalJeopardyPanel({
         </div>
       )}
 
-      {final.question && (
+      {questionHtml && (
         <div className={isRevealing ? 'tv-question-box is-small' : 'tv-question-box'}>
           <p
             className="tv-question"
-            dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(final.question) }}
+            dangerouslySetInnerHTML={{ __html: questionHtml }}
           />
         </div>
       )}
@@ -113,6 +119,7 @@ function FinalJeopardyPanel({
           <WagerForm
             min={0}
             max={maxWager}
+            initialWager={myWager}
             submitLabel={myWager === null ? 'Place wager' : 'Change wager'}
             onSubmit={placeWager}
           />
@@ -131,6 +138,7 @@ function FinalJeopardyPanel({
           <AnswerForm
             label="Your response"
             submitLabel={myAnswer === null ? 'Answer' : 'Change answer'}
+            initialAnswer={myAnswer ?? ''}
             numberExpected={final.numberExpected === true}
             handwritten
             onSubmit={answer}

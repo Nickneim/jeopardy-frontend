@@ -1,5 +1,6 @@
-import { redirect, type LoaderFunctionArgs } from 'react-router'
+import type { LoaderFunctionArgs } from 'react-router'
 import { get } from './client'
+import { pageParam, redirectPastLastPage } from './paging'
 import type { ClueType } from './clues'
 
 export interface GameSummary {
@@ -113,18 +114,7 @@ export async function gamesLoader({
   request,
 }: LoaderFunctionArgs): Promise<GamesLoaderData> {
   const url = new URL(request.url)
-
-  const pageParam = url.searchParams.get('page')
-
-  const page = pageParam === null
-    ? 0
-    : Number(pageParam)
-
-  if (!Number.isInteger(page) || page < 0) {
-    throw new Response('Invalid page parameter', {
-      status: 400,
-    })
-  }
+  const page = pageParam(url)
 
   const filters: GameFilters = {}
 
@@ -141,11 +131,7 @@ export async function gamesLoader({
     getSeasons(),
   ])
 
-  // Past the last page (e.g. a stale link): go to the last page instead.
-  if (games.totalPages > 0 && page >= games.totalPages) {
-    url.searchParams.set('page', String(games.totalPages - 1))
-    throw redirect(`${url.pathname}?${url.searchParams}`)
-  }
+  redirectPastLastPage(url, page, games.totalPages)
 
   return { games, seasons, filters }
 }

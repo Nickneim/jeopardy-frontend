@@ -34,6 +34,15 @@ describe('ErrorPage', () => {
     expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument()
   })
 
+  test('says a game that no longer exists has ended, with a way to live games', async () => {
+    renderError(new ApiError(404, 'Game session not found', 'SESSION_NOT_FOUND'))
+
+    expect(await screen.findByText(/This game has ended/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'See the live games' }))
+      .toHaveAttribute('href', '/sessions')
+    expect(screen.queryByText('Error 404')).not.toBeInTheDocument()
+  })
+
   test('shows a thrown Response as it is', async () => {
     renderError(new Response('Bad page number', { status: 400 }))
 

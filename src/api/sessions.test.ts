@@ -246,6 +246,31 @@ describe('sessionsAction: hosting', () => {
     expect(put).not.toHaveBeenCalled()
   })
 
+  test('cleans the name like the backend before creating anything', async () => {
+    const zeroWidth = String.fromCharCode(0x200b, 0x2060, 0xfeff)
+
+    const blank = await sessionsAction(args(
+      'http://localhost/sessions', {}, { gameId: '735', playerName: ` ${zeroWidth} ` },
+    ))
+
+    // A name the backend would see as blank never leaves an empty session.
+    expect(blank).toEqual({ error: 'Enter your name to host.' })
+    expect(put).not.toHaveBeenCalled()
+
+    vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
+    vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
+
+    await sessionsAction(args(
+      'http://localhost/sessions', {}, { gameId: '735', playerName: `${zeroWidth}Alice ` },
+    ))
+
+    expect(post).toHaveBeenCalledWith(
+      `/game-sessions/${SESSION_ID}/players`,
+      { playerName: 'Alice' },
+      { session: SESSION_ID },
+    )
+  })
+
   test('rejects an invalid game id with a 400', async () => {
     const response = await thrown(
       sessionsAction(args('http://localhost/sessions', {}, { gameId: 'x' })),
@@ -268,6 +293,18 @@ describe('sessionsAction: join with a code', () => {
       `/game-sessions/${SESSION_ID}`,
       { session: SESSION_ID },
     )
+    expect((response as Response).headers.get('Location'))
+      .toBe(`/sessions/${SESSION_ID}`)
+  })
+
+  test.each([
+    `https://jeopardy.example/sessions/${SESSION_ID}`,
+    `  http://localhost:5173/sessions/${SESSION_ID.toLowerCase()}?x=1 `,
+  ])('opens a pasted share link %j', async link => {
+    vi.mocked(get).mockResolvedValue(makeSession())
+
+    const response = await sessionsAction(args(url, {}, { code: link }))
+
     expect((response as Response).headers.get('Location'))
       .toBe(`/sessions/${SESSION_ID}`)
   })

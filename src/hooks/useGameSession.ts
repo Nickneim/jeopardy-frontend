@@ -8,13 +8,12 @@ import {
   type JoinedPlayer,
   type SessionTimers,
 } from '../api/sessions'
-import { ApiError, isServerOffline } from '../api/errors'
+import { hasErrorCode, isServerOffline } from '../api/errors'
 
 export type ConnectionStatus =
   | 'connecting'
   | 'connected'
   | 'reconnecting'
-  | 'gone'
   // Neither the WebSocket nor the REST API can be reached.
   | 'offline'
   // The connection is over for good: see SessionEnd.
@@ -36,6 +35,9 @@ export type SessionEnd =
   // The session was removed (CLOSED): it sends nothing more, and would
   // reject a reconnect.
   | { reason: 'closed' }
+  // The session no longer exists, without its CLOSED snapshot having
+  // arrived (e.g. it was removed while this tab was reconnecting).
+  | { reason: 'gone' }
 
 export interface SessionSnapshot {
   session: GameSession
@@ -174,9 +176,8 @@ export function useGameSession(
           if (isServerOffline(fetchError)) {
             stop()
             setStatus('offline')
-          } else if (fetchError instanceof ApiError && fetchError.status === 404) {
-            stop()
-            setStatus('gone')
+          } else if (hasErrorCode(fetchError, 'SESSION_NOT_FOUND')) {
+            end({ reason: 'gone' })
           }
         })
         .finally(() => { checkingServer = false })
@@ -209,10 +210,8 @@ export function useGameSession(
         getSession(sessionId)
           .then(accept)
           .catch(fetchError => {
-            if (!stopped && fetchError instanceof ApiError &&
-              fetchError.status === 404) {
-              setStatus('gone')
-              stop()
+            if (!stopped && hasErrorCode(fetchError, 'SESSION_NOT_FOUND')) {
+              end({ reason: 'gone' })
             }
           })
       },
@@ -266,18 +265,12 @@ export function useGameSession(
 
   useEffect(() => () => window.clearTimeout(errorTimerRef.current), [])
 
-  // No need to wait for the server's ERROR frame to say so. The last player
-  // leaving closes the session at once.
-  function leave(): boolean {
-    if (!player || !send('leave')) {
-      return false
-    }
+  // The latest state, for the actions below.
+  const latestRef = useRef({ session: initial, player })
 
-    end(isLastPlayer(snapshot.session, player.playerId)
-      ? { reason: 'abandoned' }
-      : { reason: 'left' })
-    return true
-  }
+  useEffect(() => {
+    latestRef.current = { session: snapshot.session, player }
+  })
 
   function send(action: string, body?: object): boolean {
     const client = clientRef.current
@@ -298,7 +291,25 @@ export function useGameSession(
     return true
   }
 
-  const actions: SessionActions = {
+  // No need to wait for the server's ERROR frame to say so. The last player
+  // leaving closes the session at once.
+  function leave(): boolean {
+    const latest = latestRef.current
+
+    if (!latest.player || !send('leave')) {
+      return false
+    }
+
+    end(isLastPlayer(latest.session, latest.player.playerId)
+      ? { reason: 'abandoned' }
+      : { reason: 'left' })
+    return true
+  }
+
+  // Made once per mount (the session id doesn't change in one), so they
+  // stay the same across renders: the countdown re-renders ten times a
+  // second, and effects such as BuzzButton's Space key depend on them.
+  const [actions] = useState<SessionActions>(() => ({
     start: () => send('start'),
     chooseClue: clueId => send('choose-clue', { clueId }),
     buzz: () => send('buzz'),
@@ -313,7 +324,7 @@ export function useGameSession(
     updateSettings: settings => send('update-settings', settings),
     kick: playerId => send('kick', { playerId }),
     leave,
-  }
+  }))
 
   return { ...snapshot, status, error, actions }
 }

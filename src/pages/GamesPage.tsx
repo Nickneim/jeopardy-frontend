@@ -10,28 +10,16 @@ import type {
   GamesLoaderData,
 } from '../api/games'
 import GameFilterForm from '../components/GameFilterForm'
+import Pagination from '../components/Pagination'
 
 function GamesPage() {
   const { games, seasons, filters } = useLoaderData() as GamesLoaderData
   const navigation = useNavigation()
   const location = useLocation()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [, setSearchParams] = useSearchParams()
 
-  const page = games.page
   const isLoading = navigation.state !== 'idle'
   const hasFilters = Object.keys(filters).length > 0
-
-  function goToPage(newPage: number) {
-    const newParams = new URLSearchParams(searchParams)
-
-    if (newPage === 0) {
-      newParams.delete('page')
-    } else {
-      newParams.set('page', String(newPage))
-    }
-
-    setSearchParams(newParams)
-  }
 
   // New filters start again from the first page.
   function applyFilters(newFilters: GameFilters) {
@@ -93,33 +81,12 @@ function GamesPage() {
         </article>
       ))}
 
-      {games.totalPages > 1 && (
-        <nav aria-label="Game pagination">
-          <button
-            type="button"
-            disabled={isLoading || page === 0}
-            onClick={() => goToPage(page - 1)}
-          >
-            Previous
-          </button>
-
-          <span>
-            {' '}
-            Page {page + 1} of {games.totalPages}{' '}
-          </span>
-
-          <button
-            type="button"
-            disabled={
-              isLoading ||
-              page >= games.totalPages - 1
-            }
-            onClick={() => goToPage(page + 1)}
-          >
-            Next
-          </button>
-        </nav>
-      )}
+      <Pagination
+        page={games.page}
+        totalPages={games.totalPages}
+        disabled={isLoading}
+        label="Game pagination"
+      />
     </main>
   )
 }

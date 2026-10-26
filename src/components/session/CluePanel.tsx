@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { clueAnswersRound, type GameSession, type Player } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
 import { sanitizeClueHtml } from '../../clueHtml'
@@ -22,6 +23,12 @@ function CluePanel({
   actions,
 }: CluePanelProps) {
   const clue = session.currentClue
+  const question = clue?.question ?? null
+  // The page re-renders with every countdown tick: clean the HTML once.
+  const questionHtml = useMemo(
+    () => question && sanitizeClueHtml(question),
+    [question],
+  )
 
   if (!clue) {
     return null
@@ -76,6 +83,7 @@ function CluePanel({
                   max={clue.maxWager}
                   submitLabel="Wager"
                   allIn
+                  once
                   onSubmit={actions.placeDailyDoubleWager}
                 />
               )
@@ -93,7 +101,7 @@ function CluePanel({
           <>
             <ClueMedia clueType={clue.clueType} mediaUrl={clue.mediaUrl} />
 
-            {clue.question && (
+            {questionHtml && (
               <div
                 className={isRevealing || hasAnswers
                   ? 'tv-question-box is-small'
@@ -101,7 +109,7 @@ function CluePanel({
               >
                 <p
                   className="tv-question"
-                  dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(clue.question) }}
+                  dangerouslySetInnerHTML={{ __html: questionHtml }}
                 />
               </div>
             )}
@@ -126,6 +134,7 @@ function CluePanel({
                 label="Your response"
                 submitLabel="Answer"
                 numberExpected={clue.numberExpected === true}
+                once
                 onSubmit={actions.answer}
               />
             )}

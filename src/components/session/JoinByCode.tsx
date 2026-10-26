@@ -14,7 +14,6 @@ function JoinByCode() {
         Game code
         <input
           name="code"
-          maxLength={5}
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}

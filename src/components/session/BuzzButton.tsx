@@ -14,7 +14,9 @@ function BuzzButton({
   disabled = false,
   onBuzz,
 }: BuzzButtonProps) {
-  // The space bar buzzes too, unless the player is typing somewhere.
+  // The space bar buzzes too, unless the player is typing somewhere. It
+  // buzzes over any other focused button (Share link, say) instead of
+  // pressing it; on the buzz button itself its own click buzzes.
   useEffect(() => {
     if (!enabled || disabled) {
       return
@@ -22,9 +24,10 @@ function BuzzButton({
 
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
-      const isTyping = target?.closest('input, textarea, select, button')
+      const isTyping = target?.closest('input, textarea, select')
+      const isBuzzButton = target?.closest('.buzz-button')
 
-      if (event.code === 'Space' && !event.repeat && !isTyping) {
+      if (event.code === 'Space' && !event.repeat && !isTyping && !isBuzzButton) {
         event.preventDefault()
         onBuzz()
       }

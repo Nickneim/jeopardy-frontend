@@ -67,6 +67,8 @@ describe('FinalJeopardyPanel', () => {
 
     expect(screen.getByText(/Your wager: \$1,200/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change wager' })).toBeInTheDocument()
+    // The field shows it too, so "Change wager" doesn't quietly send $0.
+    expect(screen.getByRole('spinbutton')).toHaveValue(1200)
   })
 
   test('keeps the answer across a refresh in the answering phase', async () => {
@@ -79,6 +81,7 @@ describe('FinalJeopardyPanel', () => {
     renderPanel(finalJeopardy('FINAL_JEOPARDY_ANSWERING'))
 
     expect(screen.getByText(/Your answer: “What is Buenos Aires\?”/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('What is Buenos Aires?')
   })
 
   test('a new player in the same session starts with nothing sent', async () => {
