@@ -45,6 +45,9 @@ function FinalJeopardyPanel({
   }
 
   const isWagering = session.state === 'FINAL_JEOPARDY_WAGERING'
+  // Your score, or 0, as the server allows it.
+  const maxWager = final.players.find(p => p.playerId === me?.id)?.maxWager ??
+    Math.max(0, me?.score ?? 0)
   const isRevealing = session.state === 'FINAL_JEOPARDY_REVEALING'
 
   // The correct response in the wording you used if you got it right,
@@ -109,7 +112,7 @@ function FinalJeopardyPanel({
 
           <WagerForm
             min={0}
-            max={Math.max(0, me.score)}
+            max={maxWager}
             submitLabel={myWager === null ? 'Place wager' : 'Change wager'}
             onSubmit={placeWager}
           />

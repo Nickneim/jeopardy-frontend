@@ -72,7 +72,9 @@ async function main() {
   check('create session under the code the client picked',
     created.status === 201 && created.body.id === id, `status ${created.status}`)
   const again = await createSession(GAME_ID, id)
-  check('a taken code → 409', again.status === 409, `status ${again.status}`)
+  check('a taken code → 409 SESSION_ALREADY_EXISTS',
+    again.status === 409 && again.body?.code === 'SESSION_ALREADY_EXISTS',
+    JSON.stringify(again.body))
 
   // The backend reads a code in the path leniently: any case, O as 0, I and
   // L as 1. The session parameter is the normalized code, as the app sends
@@ -82,8 +84,9 @@ async function main() {
   check('a code typed in lowercase (O for 0, L for 1) finds the session',
     lenient.status === 200 && lenient.body.id === id, `${typed} → ${lenient.status}`)
   const invalid = await api('GET', sessionPath('7KQ2U'))
-  check('an invalid code → 400 with a message',
-    invalid.status === 400 && /Invalid session code/.test(invalid.body?.message),
+  check('an invalid code → 400 INVALID_REQUEST with a message',
+    invalid.status === 400 && invalid.body?.code === 'INVALID_REQUEST' &&
+    /Invalid session code/.test(invalid.body?.message),
     JSON.stringify(invalid.body))
 
   let list = await api('GET', '/game-sessions')
@@ -98,9 +101,10 @@ async function main() {
 
   let state = (await api('GET', sessionPath(id))).body
   check('first joiner is host', state.hostPlayerId === alice.playerId)
-  check('snapshot has timers, allowLateJoin, joinScore, leaving',
+  check('snapshot has timers, allowLateJoin, joinScore, leaving, away',
     typeof state.timers?.buzzerMs === 'number' && state.allowLateJoin === true &&
-    state.joinScore === 0 && state.players.every(p => p.leaving === false),
+    state.joinScore === 0 && state.players.every(p => p.leaving === false) &&
+    state.players.every(p => p.away === true),
     JSON.stringify({ timers: state.timers, allowLateJoin: state.allowLateJoin }))
 
   const watcher = connect(id, null)
@@ -108,6 +112,21 @@ async function main() {
   const b = connect(id, bob.token)
   await waitFor(() => watcher.connected && a.connected && b.connected)
   check('all three connected', watcher.connected && a.connected && b.connected)
+  // Their broadcasts may go out before the watcher subscribes: ask over REST.
+  let players = []
+  const end = Date.now() + 3000
+  while (Date.now() < end) {
+    players = (await api('GET', sessionPath(id))).body.players
+    if (players.every(p => p.away === false)) break
+    await sleep(100)
+  }
+  check('connected players are no longer away',
+    players.every(p => p.away === false), JSON.stringify(players))
+
+  const longName = await api('POST', sessionPath(id, '/players'), { playerName: 'x'.repeat(31) })
+  check('a name over 30 characters → 400 INVALID_REQUEST',
+    longName.status === 400 && longName.body?.code === 'INVALID_REQUEST',
+    JSON.stringify(longName.body))
 
   // Non-host actions.
   b.send('start')
@@ -156,8 +175,9 @@ async function main() {
   check('host starts game', watcher.latest()?.state === 'CHOOSING_CLUE')
 
   const late = await api('POST', sessionPath(id, '/players'), { playerName: 'Dave' })
-  check('late join refused with 409 + message',
-    late.status === 409 && !!late.body?.message, JSON.stringify(late.body))
+  check('late join refused with 409 SESSION_NOT_JOINABLE + message',
+    late.status === 409 && late.body?.code === 'SESSION_NOT_JOINABLE' &&
+    !!late.body?.message, JSON.stringify(late.body))
 
   list = await api('GET', '/game-sessions')
   entry = list.body.content.find(s => s.id === id)
@@ -192,7 +212,8 @@ async function main() {
 
   for (const conn of [watcher, a, b, c, c2]) void conn.client.deactivate()
 
-  // Second session: the leaving chooser, and the host handover.
+  // Second session: the leaving chooser, and the host handover. P2 never
+  // connects, so they're away, but they're the only one left.
   const s2 = (await createSession(GAME_ID)).body.id
   const p1 = (await api('POST', sessionPath(s2, '/players'), { playerName: 'P1' })).body
   const p2 = (await api('POST', sessionPath(s2, '/players'), { playerName: 'P2' })).body
@@ -205,10 +226,10 @@ async function main() {
   await waitFor(() => w2.latest()?.hostPlayerId === p2.playerId)
   const snap = w2.latest()
   check('host leaves → next player becomes host', snap?.hostPlayerId === p2.playerId)
-  check('leaving chooser stays with leaving: true',
-    snap?.players.find(p => p.id === p1.playerId)?.leaving === true &&
-    snap?.playerChoosingClue === p1.playerId,
-    JSON.stringify(snap?.players))
+  check('chooser leaving while choosing passes control at once and is removed',
+    !snap?.players.some(p => p.id === p1.playerId) &&
+    snap?.playerChoosingClue === p2.playerId,
+    JSON.stringify({ players: snap?.players, chooser: snap?.playerChoosingClue }))
 
   for (const conn of [w2, c1]) void conn.client.deactivate()
 

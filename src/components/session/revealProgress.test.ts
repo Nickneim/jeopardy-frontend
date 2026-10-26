@@ -12,6 +12,7 @@ function result(
     playerId,
     hasWagered: true,
     hasAnswered: true,
+    maxWager: null,
     wager,
     answer: correct ? 'What is Budapest?' : 'What is Vienna?',
     correct,

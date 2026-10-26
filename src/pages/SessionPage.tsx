@@ -9,6 +9,7 @@ import {
 import {
   forgetPlayer,
   getStoredPlayer,
+  isJoinable,
   isLastPlayer,
   type GameSession,
   type GameSessionState,
@@ -151,12 +152,12 @@ function LiveSession({
   const state = session.state
   const isConnected = status === 'connected'
   const reveal = finalRevealProgress(session, leftMs)
-  // From the Final Jeopardy reveal on the game is decided: nobody joins or
-  // leaves any more.
+  // From the Final Jeopardy reveal on the game is decided: players who
+  // leave stay in the results, so Leave goes away. Joining closes earlier,
+  // once Final Jeopardy's wagering is over.
   const isOver = state === 'FINAL_JEOPARDY_REVEALING' ||
     state === 'FINISHED_GAME'
-  const canJoin = !isOver &&
-    (state === 'WAITING_FOR_START' || session.allowLateJoin)
+  const canJoin = isJoinable(session)
   const lockedOut = session.playersLockedOut
     .filter(id => id !== session.playerAnswering)
   const canBuzz = me !== null && state === 'WAITING_FOR_BUZZER' &&
@@ -197,9 +198,9 @@ function LiveSession({
         </p>
       )}
 
-      {error && (
-        <p className="tv-strip session-error" role="alert">{error.message}</p>
-      )}
+      {error && (error.code === 'TOO_LATE'
+        ? <p className="tv-strip session-error is-late" role="status">{error.message}</p>
+        : <p className="tv-strip session-error" role="alert">{error.message}</p>)}
 
       <div className={state === 'CHOOSING_CLUE' ? 'tv-screen is-board' : 'tv-screen'}>
         {/* Game actions go over the live connection: until it's up, a click
@@ -281,6 +282,7 @@ function LiveSession({
         lights={lights}
         lockedOut={lockedOut}
         badges={badges}
+        leavingLabel={isOver ? 'Left' : 'Leaving'}
         scores={reveal?.scores ?? NO_SCORES}
         isConnected={isConnected}
         canBuzz={canBuzz}

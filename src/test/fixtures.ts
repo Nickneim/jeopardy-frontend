@@ -8,6 +8,7 @@ export function makePlayer(overrides: Partial<Player> = {}): Player {
     name: 'Alice',
     score: 0,
     leaving: false,
+    away: false,
     ...overrides,
   }
 }
@@ -27,7 +28,7 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
       clueRevealMs: 3000,
       dailyDoubleWagerMs: 30000,
       buzzerMs: 10000,
-      answerMs: 5000,
+      answerMs: 15000,
       answerRevealMs: 3000,
       finalJeopardyWagerMs: 30000,
       finalJeopardyAnswerMs: 30000,

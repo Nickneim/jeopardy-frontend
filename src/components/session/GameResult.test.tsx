@@ -63,8 +63,8 @@ describe('GameResult', () => {
       answer: 'Buenos Aires',
       acceptedAnswers: { required: 1, options: ['Buenos Aires'] },
       players: [
-        { playerId: 1, hasWagered: true, hasAnswered: true, wager: 1000, answer: 'What is Buenos Aires?', correct: true, phrasedAsQuestion: true, matchedAnswers: ['Buenos Aires'], alsoAccepted: [] },
-        { playerId: 2, hasWagered: true, hasAnswered: true, wager: 500, answer: 'Lima', correct: false, phrasedAsQuestion: false, matchedAnswers: null, alsoAccepted: null },
+        { playerId: 1, hasWagered: true, hasAnswered: true, maxWager: null, wager: 1000, answer: 'What is Buenos Aires?', correct: true, phrasedAsQuestion: true, matchedAnswers: ['Buenos Aires'], alsoAccepted: [] },
+        { playerId: 2, hasWagered: true, hasAnswered: true, maxWager: null, wager: 500, answer: 'Lima', correct: false, phrasedAsQuestion: false, matchedAnswers: null, alsoAccepted: null },
       ],
     }
 

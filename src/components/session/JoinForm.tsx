@@ -1,6 +1,7 @@
 import { Form, useActionData, useNavigation } from 'react-router'
 import {
   getRememberedPlayerName,
+  MAX_NAME_LENGTH,
   type JoinActionData,
 } from '../../api/sessions'
 import { formatMoney } from '../../format'
@@ -27,7 +28,7 @@ function JoinForm({
         <input
           name="playerName"
           required
-          maxLength={40}
+          maxLength={MAX_NAME_LENGTH}
           autoComplete="nickname"
           defaultValue={getRememberedPlayerName()}
           autoFocus

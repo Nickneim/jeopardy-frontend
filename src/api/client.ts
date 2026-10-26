@@ -1,9 +1,13 @@
 import axios from 'axios'
-import { ApiError } from './errors'
+import { ApiError, type ApiErrorCode } from './errors'
+import type { GameErrorCode } from './sessions'
 
+// Unexpected errors get Spring's default body instead, without code or
+// message.
 interface ApiErrorResponse {
   status: number
-  message: string
+  code?: ApiErrorCode | GameErrorCode
+  message?: string
 }
 
 const apiClient = axios.create({
@@ -21,6 +25,7 @@ async function request<T>(send: () => Promise<{ data: T }>): Promise<T> {
       throw new ApiError(
         apiError?.status ?? error.response?.status ?? 0,
         apiError?.message ?? error.message,
+        apiError?.code ?? null,
       )
     }
 

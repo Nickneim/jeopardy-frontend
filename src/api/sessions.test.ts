@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { makeSession, SESSION_ID } from '../test/fixtures'
+import { makePlayer, makeSession, SESSION_ID } from '../test/fixtures'
 import { randomSessionCode } from '../sessionCode'
 import { get, post, put } from './client'
 import { ApiError } from './errors'
@@ -8,6 +8,8 @@ import {
   clueAnswersRound,
   getRememberedPlayerName,
   getStoredPlayer,
+  isJoinable,
+  isLastPlayer,
   joinSessionAction,
   sessionLoader,
   sessionsAction,
@@ -178,7 +180,7 @@ describe('sessionsAction: hosting', () => {
 
   test('shows a name the backend rejects on the form', async () => {
     vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
-    vi.mocked(post).mockRejectedValue(new ApiError(400, 'Name too long'))
+    vi.mocked(post).mockRejectedValue(new ApiError(400, 'Name too long', 'INVALID_REQUEST'))
 
     const result = await sessionsAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
@@ -193,7 +195,7 @@ describe('sessionsAction: hosting', () => {
       .mockReturnValueOnce('AAAAA')
       .mockReturnValueOnce(SESSION_ID)
     vi.mocked(put)
-      .mockRejectedValueOnce(new ApiError(409, 'Game session already exists: AAAAA'))
+      .mockRejectedValueOnce(new ApiError(409, 'Game session already exists: AAAAA', 'SESSION_ALREADY_EXISTS'))
       .mockResolvedValueOnce({ id: SESSION_ID })
     vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
 
@@ -212,12 +214,36 @@ describe('sessionsAction: hosting', () => {
   })
 
   test('gives up after 5 taken codes', async () => {
-    vi.mocked(put).mockRejectedValue(new ApiError(409, 'Game session already exists'))
+    vi.mocked(put).mockRejectedValue(new ApiError(409, 'Game session already exists', 'SESSION_ALREADY_EXISTS'))
 
     await expect(sessionsAction(
       args('http://localhost/sessions', {}, { gameId: '735', playerName: 'Alice' }),
     )).rejects.toThrow('Game session already exists')
     expect(put).toHaveBeenCalledTimes(5)
+  })
+
+  test("says on the form why a game can't be played", async () => {
+    vi.mocked(put).mockRejectedValue(new ApiError(
+      422,
+      "Game 725 can't be played: the board has no clues",
+      'UNPLAYABLE_GAME',
+    ))
+
+    const result = await sessionsAction(
+      args('http://localhost/sessions', {}, { gameId: '725', playerName: 'Alice' }),
+    )
+
+    expect(result).toEqual({ error: "Game 725 can't be played: the board has no clues" })
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  test('rejects a name over 30 characters, counting emoji as one', async () => {
+    const result = await sessionsAction(args(
+      'http://localhost/sessions', {}, { gameId: '735', playerName: '😀'.repeat(31) },
+    ))
+
+    expect(result).toEqual({ error: 'Names can be at most 30 characters.' })
+    expect(put).not.toHaveBeenCalled()
   })
 
   test('rejects an invalid game id with a 400', async () => {
@@ -255,7 +281,7 @@ describe('sessionsAction: join with a code', () => {
   })
 
   test('says when no game has the code', async () => {
-    vi.mocked(get).mockRejectedValue(new ApiError(404, 'Game session not found'))
+    vi.mocked(get).mockRejectedValue(new ApiError(404, 'Game session not found', 'SESSION_NOT_FOUND'))
 
     expect(await sessionsAction(args(url, {}, { code: '7KQ2M' })))
       .toEqual({ error: "There's no live game with the code 7KQ2M." })
@@ -290,8 +316,11 @@ describe('joinSessionAction', () => {
     expect(post).not.toHaveBeenCalled()
   })
 
-  test.each([400, 409])('shows a %i from the backend on the form', async status => {
-    vi.mocked(post).mockRejectedValue(new ApiError(status, 'Nope'))
+  test.each([
+    [400, 'INVALID_REQUEST'],
+    [409, 'SESSION_NOT_JOINABLE'],
+  ] as const)('shows a %i %s from the backend on the form', async (status, code) => {
+    vi.mocked(post).mockRejectedValue(new ApiError(status, 'Nope', code))
 
     const result = await joinSessionAction(args(url, params, { playerName: 'Bob' }))
 
@@ -300,10 +329,34 @@ describe('joinSessionAction', () => {
   })
 
   test('lets other errors through to the error page', async () => {
-    vi.mocked(post).mockRejectedValue(new ApiError(404, 'Game session not found'))
+    vi.mocked(post).mockRejectedValue(new ApiError(404, 'Game session not found', 'SESSION_NOT_FOUND'))
 
     await expect(joinSessionAction(args(url, params, { playerName: 'Bob' })))
       .rejects.toThrow('Game session not found')
+  })
+})
+
+describe('isJoinable', () => {
+  test("follows allowLateJoin during the game, until Final Jeopardy's wagering ends", () => {
+    expect(isJoinable(makeSession({ allowLateJoin: false }))).toBe(true)
+    expect(isJoinable(makeSession({ state: 'CHOOSING_CLUE' }))).toBe(true)
+    expect(isJoinable(makeSession({ state: 'CHOOSING_CLUE', allowLateJoin: false })))
+      .toBe(false)
+    expect(isJoinable(makeSession({ state: 'FINAL_JEOPARDY_WAGERING' }))).toBe(true)
+    expect(isJoinable(makeSession({ state: 'FINAL_JEOPARDY_ANSWERING' }))).toBe(false)
+    expect(isJoinable(makeSession({ state: 'FINISHED_GAME' }))).toBe(false)
+  })
+})
+
+describe('isLastPlayer', () => {
+  const players = [makePlayer({ id: 1 }), makePlayer({ id: 2, leaving: true })]
+
+  test('is true when everyone else has left', () => {
+    expect(isLastPlayer(makeSession({ state: 'CHOOSING_CLUE', players }), 1)).toBe(true)
+  })
+
+  test('is never true once the game has finished, whose results stay', () => {
+    expect(isLastPlayer(makeSession({ state: 'FINISHED_GAME', players }), 1)).toBe(false)
   })
 })
 

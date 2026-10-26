@@ -5,7 +5,7 @@ import {
 } from 'react-router'
 import { get, post, put } from './client'
 import type { ClueType } from './clues'
-import { ApiError } from './errors'
+import { hasErrorCode } from './errors'
 import type { PageResponse } from './games'
 import { normalizeSessionCode, randomSessionCode } from '../sessionCode'
 
@@ -32,6 +32,8 @@ export type GameErrorCode =
   | 'SESSION_NOT_FOUND'
   | 'NOT_YOUR_TURN'
   | 'INVALID_STATE'
+  // A moment too late (someone else buzzed first, time ran out): not a bug.
+  | 'TOO_LATE'
   | 'CLUE_NOT_FOUND'
   | 'CLUE_ALREADY_PLAYED'
   | 'PLAYER_NOT_IN_SESSION'
@@ -40,13 +42,26 @@ export type GameErrorCode =
   | 'UNAUTHENTICATED'
   | 'NOT_HOST'
   | 'PLAYER_NOT_FOUND'
+  | 'INTERNAL_ERROR'
 
 export interface Player {
   id: number
   name: string
   score: number
-  // Left (or was kicked) but still holds a role; removed when it ends.
+  // Left (or was kicked) but still holds a role, removed when it ends; or
+  // left from the Final Jeopardy reveal on, staying in the results.
   leaving: boolean
+  // No open connection: closed tab, lost network, or not connected yet.
+  away: boolean
+}
+
+// Limits on what players type, in Unicode code points ([...text].length),
+// as the backend counts them.
+export const MAX_NAME_LENGTH = 30
+export const MAX_ANSWER_LENGTH = 200
+
+export function textLength(text: string): number {
+  return [...text].length
 }
 
 // Phase durations in milliseconds.
@@ -71,7 +86,7 @@ export const DEFAULT_TIMERS: SessionTimers = {
   clueRevealMs: 3000,
   dailyDoubleWagerMs: 30000,
   buzzerMs: 10000,
-  answerMs: 5000,
+  answerMs: 15000,
   answerRevealMs: 3000,
   finalJeopardyWagerMs: 30000,
   finalJeopardyAnswerMs: 30000,
@@ -98,6 +113,9 @@ export interface CurrentClue {
   value: number
   dailyDouble: boolean
   wager: number | null
+  // The chooser's allowed wager, only while wagering on a Daily Double.
+  minWager: number | null
+  maxWager: number | null
   question: string | null
   clueType: ClueType | null
   mediaUrl: string | null
@@ -130,8 +148,11 @@ export interface ClueAnswer {
 
 export interface FinalJeopardyPlayer {
   playerId: number
+  // A missing wager still counts as 0.
   hasWagered: boolean
   hasAnswered: boolean
+  // The most they can wager, only in FINAL_JEOPARDY_WAGERING.
+  maxWager: number | null
   wager: number | null
   answer: string | null
   correct: boolean | null
@@ -194,12 +215,29 @@ export function clueAnswersRound(session: GameSession): GameRound {
 }
 
 // Whether nobody else is still playing, so this player leaving closes the
-// session.
+// session. A finished game's results stay until it times out.
 export function isLastPlayer(
   session: GameSession,
   playerId: number | undefined,
 ): boolean {
-  return !session.players.some(p => p.id !== playerId && !p.leaving)
+  return session.state !== 'FINISHED_GAME' &&
+    !session.players.some(p => p.id !== playerId && !p.leaving)
+}
+
+// Whether a join would be accepted now, like the live games list's
+// `joinable`: never once Final Jeopardy's wagering is over (api.md §6.6).
+export function isJoinable(session: GameSession): boolean {
+  switch (session.state) {
+    case 'WAITING_FOR_START':
+      return true
+    case 'FINAL_JEOPARDY_ANSWERING':
+    case 'FINAL_JEOPARDY_REVEALING':
+    case 'FINISHED_GAME':
+    case 'CLOSED':
+      return false
+    default:
+      return session.allowLateJoin
+  }
 }
 
 export interface GameSessionError {
@@ -249,7 +287,7 @@ export async function createSession(gameId: number): Promise<{ id: string }> {
         routedTo(id),
       )
     } catch (error) {
-      const taken = error instanceof ApiError && error.status === 409
+      const taken = hasErrorCode(error, 'SESSION_ALREADY_EXISTS')
 
       if (!taken || attempt === CREATE_ATTEMPTS) {
         throw error
@@ -460,6 +498,8 @@ export interface JoinActionData {
   error: string
 }
 
+const NAME_TOO_LONG = `Names can be at most ${MAX_NAME_LENGTH} characters.`
+
 // Hosting is creating a session and joining it as its first player, who
 // becomes the host.
 async function createSessionAction({
@@ -479,7 +519,22 @@ async function createSessionAction({
     return { error: 'Enter your name to host.' }
   }
 
-  const { id } = await createSession(gameId)
+  if (textLength(playerName) > MAX_NAME_LENGTH) {
+    return { error: NAME_TOO_LONG }
+  }
+
+  let id: string
+
+  try {
+    ({ id } = await createSession(gameId))
+  } catch (error) {
+    // The message says why, e.g. a clue no answer could match.
+    if (hasErrorCode(error, 'UNPLAYABLE_GAME')) {
+      return { error: error.message }
+    }
+
+    throw error
+  }
 
   return await joinAsPlayer(id, playerName) ?? redirect(`/sessions/${id}`)
 }
@@ -511,7 +566,7 @@ async function openByCode(typed: string): Promise<JoinActionData | Response> {
   try {
     await getSession(code)
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
+    if (hasErrorCode(error, 'SESSION_NOT_FOUND')) {
       return { error: `There's no live game with the code ${code}.` }
     }
 
@@ -533,6 +588,10 @@ export async function joinSessionAction({
     return { error: 'Enter a name to join.' }
   }
 
+  if (textLength(playerName) > MAX_NAME_LENGTH) {
+    return { error: NAME_TOO_LONG }
+  }
+
   return await joinAsPlayer(id, playerName) ?? redirect(`/sessions/${id}`)
 }
 
@@ -549,8 +608,8 @@ async function joinAsPlayer(
     // A rejected name, or a game that stopped accepting players since the
     // page loaded, is shown on the form; anything else is a route error.
     if (
-      error instanceof ApiError &&
-      (error.status === 400 || error.status === 409)
+      hasErrorCode(error, 'INVALID_REQUEST') ||
+      hasErrorCode(error, 'SESSION_NOT_JOINABLE')
     ) {
       return { error: error.message }
     }

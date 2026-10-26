@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
+import { MAX_ANSWER_LENGTH } from '../../api/sessions'
 
 interface AnswerFormProps {
   label: string
@@ -43,6 +44,7 @@ function AnswerForm({
           className={handwritten ? 'is-hand' : 'is-serif'}
           value={answer}
           onChange={event => setAnswer(event.target.value)}
+          maxLength={MAX_ANSWER_LENGTH}
           autoFocus
           autoComplete="off"
           aria-describedby={hint ? hintId : undefined}

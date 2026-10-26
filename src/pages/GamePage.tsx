@@ -12,6 +12,7 @@ import type {
 } from '../api/games'
 import {
   getRememberedPlayerName,
+  MAX_NAME_LENGTH,
   type JoinActionData,
 } from '../api/sessions'
 import GameBoard from '../components/GameBoard'
@@ -69,7 +70,7 @@ function GamePage() {
               <input
                 name="playerName"
                 required
-                maxLength={40}
+                maxLength={MAX_NAME_LENGTH}
                 autoComplete="nickname"
                 defaultValue={getRememberedPlayerName()}
               />

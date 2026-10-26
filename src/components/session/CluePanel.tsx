@@ -8,8 +8,6 @@ import ClueAnswers from './ClueAnswers'
 import CorrectResponse from './CorrectResponse'
 import WagerForm from './WagerForm'
 
-const MIN_DAILY_DOUBLE_WAGER = 5
-
 interface CluePanelProps {
   session: GameSession
   me: Player | null
@@ -41,13 +39,6 @@ function CluePanel({
   const isMyWager = me !== null && isWagering &&
     session.playerChoosingClue === me.id
 
-  // The most a player can wager: their score, or the round's top clue value.
-  const highestValue = Math.max(
-    0,
-    ...session.board.flatMap(c => c.slots.map(slot => slot.value ?? 0)),
-  )
-  const maxDailyDoubleWager = Math.max(me?.score ?? 0, highestValue)
-
   const isMyAnswer = me !== null &&
     session.state === 'WAITING_FOR_ANSWER' &&
     session.playerAnswering === me.id
@@ -78,11 +69,11 @@ function CluePanel({
               <span>Double</span>
             </h2>
 
-            {isMyWager
+            {isMyWager && clue.minWager !== null && clue.maxWager !== null
               ? (
                 <WagerForm
-                  min={MIN_DAILY_DOUBLE_WAGER}
-                  max={maxDailyDoubleWager}
+                  min={clue.minWager}
+                  max={clue.maxWager}
                   submitLabel="Wager"
                   allIn
                   onSubmit={actions.placeDailyDoubleWager}

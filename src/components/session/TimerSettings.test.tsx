@@ -48,7 +48,7 @@ describe('TimerSettings', () => {
     await userEvent.click(screen.getByLabelText('Answer'))
     await userEvent.clear(screen.getByLabelText('Answer'))
     await userEvent.tab()
-    expect(screen.getByLabelText('Answer')).toHaveValue(5)
+    expect(screen.getByLabelText('Answer')).toHaveValue(15)
 
     await userEvent.click(screen.getByLabelText('Clue reveal'))
     await userEvent.tab()
@@ -71,7 +71,7 @@ describe('TimerSettings reset', () => {
     expect(resets).toHaveLength(9)
     expect(resets.filter(button => !(button as HTMLButtonElement).disabled))
       .toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Reset Answer to the default, 5s' }))
+    expect(screen.getByRole('button', { name: 'Reset Answer to the default, 15s' }))
       .toBeDisabled()
 
     await userEvent.click(

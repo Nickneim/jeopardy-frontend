@@ -74,6 +74,8 @@ function GameResult({
               <span className="game-result-name tv-hand">
                 <span>{player.name}</span>
                 {player.id === myPlayerId && <span className="tv-you">You</span>}
+                {/* Players who leave once the results are in stay in them. */}
+                {player.leaving && <span className="tv-you is-left">Left</span>}
               </span>
 
               <span

@@ -1,13 +1,37 @@
+import type { GameErrorCode } from './sessions'
+
+// What went wrong, in an ApiErrorResponse (api.md §3). React to it rather
+// than to the status: two different 409s can answer one request.
+export type ApiErrorCode =
+  | 'INVALID_REQUEST'
+  | 'GAME_NOT_FOUND'
+  | 'CLUE_NOT_FOUND'
+  | 'UNPLAYABLE_GAME'
+  | 'SESSION_ALREADY_EXISTS'
+  | 'SESSION_NOT_JOINABLE'
+
 export class ApiError extends Error {
   status: number;
+  // Null without an ApiErrorResponse body: no response, a proxy's error
+  // page, or Spring's default body for an unexpected error.
+  code: ApiErrorCode | GameErrorCode | null;
   constructor(
     status: number,
     message: string,
+    code: ApiErrorCode | GameErrorCode | null = null,
   ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
+}
+
+export function hasErrorCode(
+  error: unknown,
+  code: ApiErrorCode | GameErrorCode,
+): error is ApiError {
+  return error instanceof ApiError && error.code === code
 }
 
 // What a request gets while the backend is switched off: no response at all

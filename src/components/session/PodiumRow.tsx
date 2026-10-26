@@ -15,6 +15,8 @@ interface PodiumRowProps {
   lights: number
   lockedOut: number[]
   badges: Map<number, string>
+  // What a leaving player's badge says.
+  leavingLabel: string
   // New scores during the Final Jeopardy reveal.
   scores: Map<number, number>
   // Buzzing and kicking wait for the live connection.
@@ -34,6 +36,7 @@ function PodiumRow({
   lights,
   lockedOut,
   badges,
+  leavingLabel,
   scores,
   isConnected,
   canBuzz,
@@ -90,6 +93,8 @@ function PodiumRow({
         lights={player.id === activeId ? lights : 0}
         isLockedOut={lockedOut.includes(player.id)}
         isLeaving={player.leaving}
+        leavingLabel={leavingLabel}
+        isAway={player.away}
         badge={badges.get(player.id) ?? null}
         isConnected={isConnected}
         canBuzz={canBuzz}

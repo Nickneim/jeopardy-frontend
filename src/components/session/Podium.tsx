@@ -17,6 +17,12 @@ interface PodiumProps {
   lights: number
   isLockedOut: boolean
   isLeaving: boolean
+  // What a leaving player's badge says: "Leaving", or "Left" once the
+  // results are shown.
+  leavingLabel: string
+  // No connection right now (a closed tab, say): the game goes on without
+  // waiting for them.
+  isAway: boolean
   // A short note such as "Wagered" in Final Jeopardy.
   badge: string | null
   isConnected: boolean
@@ -34,6 +40,8 @@ function Podium({
   lights,
   isLockedOut,
   isLeaving,
+  leavingLabel,
+  isAway,
   badge,
   isConnected,
   canBuzz,
@@ -46,17 +54,20 @@ function Podium({
     isActive && 'is-active',
     isLockedOut && 'is-locked-out',
     isLeaving && 'is-leaving',
+    isAway && !isLeaving && 'is-away',
   ].filter(Boolean).join(' ')
+
+  const label = isLeaving ? leavingLabel : badge ?? (isAway ? 'Away' : null)
 
   // The lights go out from both ends towards the middle.
   const middle = (PODIUM_LIGHTS - 1) / 2
 
   return (
     <div className={classNames}>
-      {(isLeaving || badge) && (
+      {label && (
         <span className="podium-badge">
-          {!isLeaving && <CheckIcon size={14} />}
-          {isLeaving ? 'Leaving' : badge}
+          {!isLeaving && badge && <CheckIcon size={14} />}
+          {label}
         </span>
       )}
 
