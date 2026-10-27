@@ -6,8 +6,9 @@ import {
 import { get, post, put } from './client'
 import type { ClueType } from './clues'
 import { hasErrorCode } from './errors'
-import type { PageResponse } from './games'
+import { getRandomGame, type PageResponse } from './games'
 import { pageParam, redirectPastLastPage } from './paging'
+import { sortParams, type ListSort } from './listSort'
 import { normalizeSessionCode, randomSessionCode } from '../sessionCode'
 
 export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
@@ -258,6 +259,9 @@ export interface GameSessionSummary {
   id: string
   gameId: number | null
   gameTitle: string | null
+  // The game's season and air date ("YYYY-MM-DD"), null without a game.
+  gameSeason: string | null
+  gameDate: string | null
   state: GameSessionState
   round: GameRound
   playerCount: number
@@ -305,16 +309,75 @@ export async function createSession(gameId: number): Promise<{ id: string }> {
   }
 }
 
+// Where a live game is, as the live games list shows, filters and sorts it
+// (in this order): the lobby, a round in progress, or finished. The backend
+// derives it the same way.
+export type SessionStage = 'LOBBY' | GameRound | 'FINISHED'
+
+export const SESSION_STAGES: readonly SessionStage[] = [
+  'LOBBY',
+  'JEOPARDY',
+  'DOUBLE_JEOPARDY',
+  'FINAL_JEOPARDY',
+  'FINISHED',
+]
+
+export function sessionStage(session: GameSessionSummary): SessionStage {
+  switch (session.state) {
+    case 'WAITING_FOR_START':
+      return 'LOBBY'
+    case 'FINISHED_GAME':
+    case 'CLOSED':
+      return 'FINISHED'
+    default:
+      return session.round
+  }
+}
+
+export interface SessionFilters {
+  // Part of the game's title or the host's name.
+  search?: string
+  stage?: SessionStage
+  joinable?: boolean
+  includeFinished?: boolean
+}
+
+export const SESSION_SORT_COLUMNS = [
+  'id',
+  'gameTitle',
+  'gameSeason',
+  'gameDate',
+  'hostName',
+  'playerCount',
+  'stage',
+  'createdAt',
+] as const
+
+export type SessionSortColumn = typeof SESSION_SORT_COLUMNS[number]
+
+export type SessionSort = ListSort<SessionSortColumn>
+
+// The backend's own order: newest first.
+export const DEFAULT_SESSION_SORT: SessionSort = {
+  sort: 'createdAt',
+  direction: 'desc',
+}
+
 export function getSessions(
   page = 0,
   size = 20,
-  includeFinished = false,
+  filters: SessionFilters = {},
+  sort: SessionSort = DEFAULT_SESSION_SORT,
 ): Promise<PageResponse<GameSessionSummary>> {
   return get<PageResponse<GameSessionSummary>>('/game-sessions', {
     page,
     size,
+    search: filters.search,
+    stage: filters.stage,
+    joinable: filters.joinable ? 'true' : undefined,
     // Without it, the backend leaves finished games out.
-    includeFinished: includeFinished ? 'true' : undefined,
+    includeFinished: filters.includeFinished ? 'true' : undefined,
+    ...sort,
   })
 }
 
@@ -436,21 +499,61 @@ export function rememberSentFinalJeopardy(
 
 const PAGE_SIZE = 20
 
+export interface SessionsLoaderData {
+  sessions: PageResponse<GameSessionSummary>
+  filters: SessionFilters
+  sort: SessionSort
+}
+
+// The list's filters from the URL: `search`, `stage`, `joinable` and
+// `finished`.
+function sessionFilterParams(url: URL): SessionFilters {
+  const params = url.searchParams
+  const stage = params.get('stage')
+
+  if (stage && !SESSION_STAGES.includes(stage as SessionStage)) {
+    throw new Response('Invalid stage parameter', {
+      status: 400,
+    })
+  }
+
+  return {
+    search: params.get('search')?.trim() || undefined,
+    stage: (stage || undefined) as SessionStage | undefined,
+    joinable: params.get('joinable') === 'true' || undefined,
+    // Finished games are only listed when asked for, or filtered on.
+    includeFinished: params.get('finished') === 'true' ||
+      stage === 'FINISHED' || undefined,
+  }
+}
+
 export async function sessionsLoader({
   request,
-}: LoaderFunctionArgs): Promise<PageResponse<GameSessionSummary>> {
+}: LoaderFunctionArgs): Promise<SessionsLoaderData> {
   const url = new URL(request.url)
   const page = pageParam(url)
+  const filters = sessionFilterParams(url)
+  const sort = sortParams(url, SESSION_SORT_COLUMNS, DEFAULT_SESSION_SORT)
 
-  const sessions = await getSessions(
-    page,
-    PAGE_SIZE,
-    url.searchParams.get('finished') === 'true',
-  )
+  const sessions = await getSessions(page, PAGE_SIZE, filters, sort)
 
   redirectPastLastPage(url, page, sessions.totalPages)
 
-  return sessions
+  return { sessions, filters, sort }
+}
+
+export interface HomeLoaderData {
+  // How many games are on, or null when that can't be told right now.
+  liveCount: number | null
+}
+
+// The home page works without the game server: it only counts live games.
+export async function homeLoader(): Promise<HomeLoaderData> {
+  try {
+    return { liveCount: (await getSessions(0, 1)).totalElements }
+  } catch {
+    return { liveCount: null }
+  }
 }
 
 export interface SessionLoaderData {
@@ -501,16 +604,10 @@ async function createSessionAction({
   request,
 }: ActionFunctionArgs): Promise<JoinActionData | Response> {
   const formData = await request.formData()
-  const gameId = Number(formData.get('gameId'))
+  const random = formData.get('random') === 'true'
   // Checked like the backend will, before the session exists: a name it
   // rejects would leave an empty session behind.
   const playerName = cleanPlayerName(String(formData.get('playerName') ?? ''))
-
-  if (!Number.isInteger(gameId) || gameId <= 0) {
-    throw new Response('Invalid game ID', {
-      status: 400,
-    })
-  }
 
   if (!playerName) {
     return { error: 'Enter your name to host.' }
@@ -518,6 +615,17 @@ async function createSessionAction({
 
   if (textLength(playerName) > MAX_NAME_LENGTH) {
     return { error: NAME_TOO_LONG }
+  }
+
+  // "Host a random game" picks it only now, with a valid name.
+  const gameId = random
+    ? (await getRandomGame()).id
+    : Number(formData.get('gameId'))
+
+  if (!Number.isInteger(gameId) || gameId <= 0) {
+    throw new Response('Invalid game ID', {
+      status: 400,
+    })
   }
 
   let id: string
@@ -537,7 +645,7 @@ async function createSessionAction({
 }
 
 // The live games list's route takes two forms: hosting, from a game page,
-// and "Join with a code".
+// the games list or the home page (a random game), and "Join with a code".
 export async function sessionsAction(
   args: ActionFunctionArgs,
 ): Promise<JoinActionData | Response> {

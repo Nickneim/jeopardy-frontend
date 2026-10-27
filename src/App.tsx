@@ -1,14 +1,17 @@
-import { NavLink, Outlet, useMatch } from 'react-router'
+import { Link, NavLink, Outlet, useMatch } from 'react-router'
 
 function App() {
-  // A live game uses the whole page; its status bar links home instead.
+  // A live game uses the whole page; its status bar links home instead. The
+  // home page is the menu itself.
   const inSession = useMatch('/sessions/:id')
+  const atHome = useMatch('/')
 
   return (
     <>
-      {!inSession && (
+      {!inSession && !atHome && (
         <nav className="site-nav">
-          <NavLink to="/games">Games</NavLink>
+          <Link to="/" className="site-logo" aria-label="Home">J!</Link>
+          <NavLink to="/games">Catalog</NavLink>
           <NavLink to="/sessions" end>Live games</NavLink>
         </nav>
       )}

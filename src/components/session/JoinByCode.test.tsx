@@ -29,7 +29,7 @@ describe('JoinByCode', () => {
     renderForm(action)
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Game code' }), '7kq2m')
-    await userEvent.click(screen.getByRole('button', { name: 'Join with a code' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }))
 
     expect(await screen.findByText('Session page')).toBeInTheDocument()
     expect(action).toHaveBeenCalledWith('7kq2m')
@@ -41,7 +41,7 @@ describe('JoinByCode', () => {
 
     await userEvent.click(screen.getByRole('textbox', { name: 'Game code' }))
     await userEvent.paste(' https://jeopardy.example/sessions/7KQ2M')
-    await userEvent.click(screen.getByRole('button', { name: 'Join with a code' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }))
 
     expect(await screen.findByText('Session page')).toBeInTheDocument()
     expect(action).toHaveBeenCalledWith(' https://jeopardy.example/sessions/7KQ2M')
@@ -51,7 +51,7 @@ describe('JoinByCode', () => {
     renderForm(() => ({ error: "There's no live game with the code 7KQ2M." }))
 
     await userEvent.type(screen.getByRole('textbox', { name: 'Game code' }), '7KQ2M')
-    await userEvent.click(screen.getByRole('button', { name: 'Join with a code' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }))
 
     expect(await screen.findByRole('alert'))
       .toHaveTextContent("There's no live game with the code 7KQ2M.")

@@ -1,8 +1,6 @@
-import {
-  createBrowserRouter,
-  Navigate,
-} from 'react-router'
+import { createBrowserRouter } from 'react-router'
 import App from './App'
+import HomePage from './pages/HomePage'
 import GamesPage from './pages/GamesPage'
 import GamePage from './pages/GamePage'
 import CluePage from './pages/CluePage'
@@ -16,6 +14,7 @@ import {
 } from './api/games'
 import { clueLoader } from './api/clues'
 import {
+  homeLoader,
   joinSessionAction,
   sessionLoader,
   sessionsAction,
@@ -32,7 +31,8 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/games" replace />,
+        element: <HomePage />,
+        loader: homeLoader,
       },
       {
         path: 'games',

@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, test, vi } from 'vitest'
+import { useState } from 'react'
+import { describe, expect, test } from 'vitest'
 import type { GameCategory, GameClue } from '../api/games'
 import GameBoard from './GameBoard'
 
@@ -28,68 +29,81 @@ function makeCategory(
   }
 }
 
-function column(name: string): HTMLElement {
-  const header = screen.getByText(name)
-  return header.closest('.category-column') as HTMLElement
+// The board with the flipping state its page keeps.
+function Board({
+  categories,
+  dailyDoubleClueIds = [],
+}: {
+  categories: GameCategory[]
+  dailyDoubleClueIds?: number[]
+}) {
+  const [flipped, setFlipped] = useState<number[]>([])
+
+  return (
+    <GameBoard
+      categories={categories}
+      dailyDoubleClueIds={dailyDoubleClueIds}
+      isFlipped={id => flipped.includes(id)}
+      onFlip={id => setFlipped(current => current.includes(id)
+        ? current.filter(other => other !== id)
+        : [...current, id])}
+    />
+  )
+}
+
+function values(): string[] {
+  return [...document.querySelectorAll('.board-value')]
+    .map(value => value.textContent ?? '')
 }
 
 describe('GameBoard', () => {
   test('values Jeopardy clues at $200 per row', () => {
-    render(
-      <GameBoard
-        categories={[makeCategory(1, [makeClue(1, 1), makeClue(2, 5)])]}
-        dailyDoubleClueIds={[]}
-        onClueClick={() => {}}
-      />,
-    )
+    render(<Board categories={[makeCategory(1, [makeClue(1, 1), makeClue(2, 5)])]} />)
 
-    const clues = within(column('Category 1')).getAllByRole('button')
-    expect(clues.map(clue => clue.textContent)).toEqual(['$200', '$1000'])
+    expect(values()).toEqual(['$200', '$400', '$600', '$800', '$1000'])
   })
 
   test('values Double Jeopardy clues at $400 per row', () => {
-    render(
-      <GameBoard
-        categories={[makeCategory(7, [makeClue(1, 1), makeClue(2, 5)])]}
-        dailyDoubleClueIds={[]}
-        onClueClick={() => {}}
-      />,
-    )
+    render(<Board categories={[makeCategory(7, [makeClue(1, 1), makeClue(2, 5)])]} />)
 
-    const clues = within(column('Category 7')).getAllByRole('button')
-    expect(clues.map(clue => clue.textContent)).toEqual(['$400', '$2000'])
+    expect(values()).toEqual(['$400', '$800', '$1200', '$1600', '$2000'])
   })
 
-  test('always renders 5 rows, with empty cells for gaps', () => {
-    render(
-      <GameBoard
-        categories={[makeCategory(1, [makeClue(1, 1), makeClue(3, 3)])]}
-        dailyDoubleClueIds={[]}
-        onClueClick={() => {}}
-      />,
-    )
+  test('shows every clue, and says when one is not available', () => {
+    render(<Board categories={[makeCategory(1, [makeClue(1, 1), makeClue(3, 3)])]} />)
 
-    const cells = column('Category 1').querySelectorAll('.clue-cell')
-    expect(cells).toHaveLength(5)
-    expect([...cells].map(cell => cell.textContent))
-      .toEqual(['$200', '', '$600', '', ''])
+    expect(screen.getByRole('button', { name: /Question 1/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Question 3/ })).toBeInTheDocument()
+    expect(screen.getAllByText('Clue not available')).toHaveLength(3)
   })
 
-  test('marks Daily Doubles and reports clicks with the category', async () => {
-    const onClueClick = vi.fn()
-    const category = makeCategory(2, [makeClue(10, 2)])
+  test('flips a clue to its correct response and back', async () => {
+    render(<Board categories={[makeCategory(1, [makeClue(1, 1), makeClue(2, 2)])]} />)
 
-    render(
-      <GameBoard
-        categories={[category]}
-        dailyDoubleClueIds={[10]}
-        onClueClick={onClueClick}
-      />,
-    )
-
-    const clue = screen.getByRole('button', { name: /Daily Double/ })
+    const clue = screen.getByRole('button', { name: /Question 1/ })
     await userEvent.click(clue)
 
-    expect(onClueClick).toHaveBeenCalledWith(category.clues[0], category)
+    expect(clue).toHaveAttribute('aria-pressed', 'true')
+    expect(clue).toHaveTextContent('Answer 1')
+    expect(clue).not.toHaveTextContent('Question 1')
+    // Only that one.
+    expect(screen.getByRole('button', { name: /Question 2/ })).toBeInTheDocument()
+
+    await userEvent.click(clue)
+
+    expect(clue).toHaveTextContent('Question 1')
+    expect(clue).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('marks Daily Doubles', () => {
+    render(
+      <Board
+        categories={[makeCategory(2, [makeClue(10, 2)])]}
+        dailyDoubleClueIds={[10]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /Daily Double/ }))
+      .toHaveTextContent('Question 10')
   })
 })

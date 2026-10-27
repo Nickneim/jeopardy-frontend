@@ -99,7 +99,7 @@ function GameFilterForm({
         Playable games only
       </label>
 
-      <button type="submit" disabled={disabled}>
+      <button type="submit" className="gold-button" disabled={disabled}>
         Search
       </button>
     </form>

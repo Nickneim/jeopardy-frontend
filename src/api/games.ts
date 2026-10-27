@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from 'react-router'
 import { get } from './client'
 import { pageParam, redirectPastLastPage } from './paging'
 import type { ClueType } from './clues'
+import { sortParams, type ListSort } from './listSort'
 
 export interface GameSummary {
   id: number
@@ -61,16 +62,35 @@ export interface GameFilters {
   includeUnplayable?: string
 }
 
+export const GAME_SORT_COLUMNS = [
+  'title',
+  'season',
+  'gameDate',
+  'clueCount',
+] as const
+
+export type GameSortColumn = typeof GAME_SORT_COLUMNS[number]
+
+export type GameSort = ListSort<GameSortColumn>
+
+// The backend's own order: newest first.
+export const DEFAULT_GAME_SORT: GameSort = {
+  sort: 'gameDate',
+  direction: 'desc',
+}
+
 export interface GamesLoaderData {
   games: PageResponse<GameSummary>
   seasons: Season[]
   filters: GameFilters
+  sort: GameSort
 }
 
 export function getGames(
   page = 0,
   size = 20,
   filters: GameFilters = {},
+  sort: GameSort = DEFAULT_GAME_SORT,
 ): Promise<PageResponse<GameSummary>> {
   const { includeUnplayable, ...apiFilters } = filters
 
@@ -80,7 +100,28 @@ export function getGames(
     ...apiFilters,
     // Without `playable`, the backend lists both kinds.
     playable: includeUnplayable === 'true' ? undefined : 'true',
+    ...sort,
   })
+}
+
+// A random playable game, for "Host a random game": one page of one game,
+// picked among all of them.
+export async function getRandomGame(): Promise<GameSummary> {
+  const { totalElements } = await getGames(0, 1)
+
+  if (totalElements === 0) {
+    throw new Error('There are no playable games.')
+  }
+
+  const page = Math.floor(Math.random() * totalElements)
+  const [game] = (await getGames(page, 1)).content
+
+  // Only if games went away in between.
+  if (!game) {
+    throw new Error('There are no playable games.')
+  }
+
+  return game
 }
 
 // Seasons only change when games are imported, so fetch them once per page load.
@@ -126,14 +167,16 @@ export async function gamesLoader({
     }
   }
 
+  const sort = sortParams(url, GAME_SORT_COLUMNS, DEFAULT_GAME_SORT)
+
   const [games, seasons] = await Promise.all([
-    getGames(page, PAGE_SIZE, filters),
+    getGames(page, PAGE_SIZE, filters, sort),
     getSeasons(),
   ])
 
   redirectPastLastPage(url, page, games.totalPages)
 
-  return { games, seasons, filters }
+  return { games, seasons, filters, sort }
 }
 
 export function gameLoader({

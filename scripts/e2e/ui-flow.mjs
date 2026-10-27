@@ -119,6 +119,16 @@ async function newPlayer(name) {
     }
     return false
   }
+  // The "Join with a code" form, once its button is ready again.
+  page.submitCode = async (code, ms = 5000) => {
+    const ready = `document.querySelector('.code-form button[type=submit]')?.textContent === 'Join'`
+    const end = Date.now() + ms
+    while (Date.now() < end && !(await page.eval(ready))) await sleep(100)
+    await page.eval(`(() => {
+      document.querySelector('.code-form input[name=code]').value = ${JSON.stringify(code)}
+      document.querySelector('.code-form button[type=submit]').click()
+    })()`)
+  }
   page.click = label => page.eval(`(() => {
     const el = [...document.querySelectorAll('button, a')].find(e => e.textContent.trim().startsWith(${JSON.stringify(label)}))
     if (!el) throw new Error('No button or link: ' + ${JSON.stringify(label)})
@@ -173,7 +183,8 @@ try {
   // The live games list.
   await bob.goto(`${APP}/sessions`)
   check('live games list shows the session hosted by Alice with Join',
-    await bob.waitText('hosted by Alice') && (await bob.text()).includes('Join'))
+    await bob.waitText(sessionUrl.split('/').pop()) && (await bob.text()).includes('Alice') &&
+    (await bob.text()).includes('Join'))
   await bob.clickLink('Join', sessionUrl)
   check('Join link opens the session', await bob.waitText('Your name'))
   await bob.join('Bob')
@@ -210,16 +221,13 @@ try {
   const code = sessionUrl.split('/').pop()
   check('lobby shows the game code', (await alice.text()).includes(code))
   await carol.goto(`${APP}/sessions`)
-  await carol.waitText('Join with a code')
-  await carol.eval(`document.querySelector('input[name=code]').value = 'ZZZZZ'`)
-  await carol.click('Join with a code')
+  await carol.waitText('Game code')
+  await carol.submitCode('ZZZZZ')
   check('an unknown code is explained on the form',
     await carol.waitText('no live game with the code ZZZZZ'))
   // The error shows while the page still revalidates after the action, with
-  // the button reading "Opening…", so wait for it to be back.
-  await carol.waitText('Join with a code')
-  await carol.eval(`document.querySelector('input[name=code]').value = ${JSON.stringify(code.toLowerCase())}`)
-  await carol.click('Join with a code')
+  // the button reading "Opening…": submitCode waits for it to be back.
+  await carol.submitCode(code.toLowerCase())
   check('a code typed in lowercase opens the session',
     await carol.waitText('Join this game') &&
     (await carol.eval('location.href')) === sessionUrl)
@@ -280,7 +288,7 @@ try {
     await alice.waitText('leaving closes this game'))
   await alice.click('Yes, leave')
   check('last player leaving goes to the live games list',
-    await alice.waitText('Live Games') && (await alice.eval('location.pathname')) === '/sessions')
+    await alice.waitText('Live games') && (await alice.eval('location.pathname')) === '/sessions')
   check('watcher sees the closed view', await carol.waitText('Everyone left, so this game has ended.'))
   await carol.screenshot('closed.png')
 
@@ -295,7 +303,7 @@ try {
   await alice.waitText('Your pick · choose a clue')
   const url2 = await alice.eval('location.href')
   await frank.goto(`${APP}/sessions`)
-  await frank.waitText('hosted by Alice')
+  await frank.waitText('Alice')
   await frank.clickLink('Watch', url2)
   check('list Watch link opens in spectator mode, game visible',
     await frank.waitText("You're watching as a spectator") &&

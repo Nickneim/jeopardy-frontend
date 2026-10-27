@@ -9,7 +9,7 @@ function CluePage() {
   const location = useLocation()
 
   return (
-    <main>
+    <main className="site-page clue-page">
       <Link
         to={`/games/${clue.gameId}`}
         state={location.state}

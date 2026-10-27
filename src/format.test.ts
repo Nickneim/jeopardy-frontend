@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   formatAcceptedAnswers,
+  formatAirDate,
   formatAlsoAccepted,
   formatCorrectResponse,
   formatMatchedAnswers,
@@ -65,5 +66,12 @@ describe('formatMatchedAnswers and formatAlsoAccepted', () => {
     expect(formatMatchedAnswers(['myrrh', 'gold'])).toBe('myrrh and gold')
     expect(formatMatchedAnswers(['a linen cupboard'])).toBe('a linen cupboard')
     expect(formatAlsoAccepted(['Uruguay', 'Argentina'])).toBe('Uruguay or Argentina')
+  })
+})
+
+describe('formatAirDate', () => {
+  test('formats the day itself, whatever the time zone', () => {
+    expect(formatAirDate('2024-07-26')).toBe('Jul 26, 2024')
+    expect(formatAirDate('1984-09-10')).toBe('Sep 10, 1984')
   })
 })

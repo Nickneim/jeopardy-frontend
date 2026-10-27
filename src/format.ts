@@ -60,3 +60,20 @@ function joinWords(words: string[], conjunction: string): string {
 
   return `${words.slice(0, -1).join(', ')} ${conjunction} ${words[words.length - 1]}`
 }
+
+// A game's air date ("2024-07-26") as "Jul 26, 2024", the same in every time
+// zone.
+export function formatAirDate(gameDate: string): string {
+  const date = new Date(`${gameDate}T00:00:00Z`)
+
+  if (Number.isNaN(date.getTime())) {
+    return gameDate
+  }
+
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}

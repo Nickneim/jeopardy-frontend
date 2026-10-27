@@ -65,7 +65,12 @@ describe('sessionsLoader', () => {
 
     await sessionsLoader(args('http://localhost/sessions?page=1'))
 
-    expect(get).toHaveBeenCalledWith('/game-sessions', { page: 1, size: 20 })
+    expect(get).toHaveBeenCalledWith('/game-sessions', {
+      page: 1,
+      size: 20,
+      sort: 'createdAt',
+      direction: 'desc',
+    })
   })
 
   test('asks for finished games too with finished=true', async () => {
@@ -77,7 +82,51 @@ describe('sessionsLoader', () => {
       page: 0,
       size: 20,
       includeFinished: 'true',
+      sort: 'createdAt',
+      direction: 'desc',
     })
+  })
+
+  test('sends the filters and sort to the backend', async () => {
+    vi.mocked(get).mockResolvedValue(page(1))
+
+    await sessionsLoader(args(
+      'http://localhost/sessions?search=al&joinable=true&stage=LOBBY&sort=playerCount&direction=desc',
+    ))
+
+    expect(get).toHaveBeenCalledWith('/game-sessions', {
+      page: 0,
+      size: 20,
+      search: 'al',
+      stage: 'LOBBY',
+      joinable: 'true',
+      sort: 'playerCount',
+      direction: 'desc',
+    })
+  })
+
+  test('lists finished games when filtering on them', async () => {
+    vi.mocked(get).mockResolvedValue(page(1))
+
+    await sessionsLoader(args('http://localhost/sessions?stage=FINISHED'))
+
+    expect(get).toHaveBeenCalledWith('/game-sessions', expect.objectContaining({
+      stage: 'FINISHED',
+      includeFinished: 'true',
+    }))
+  })
+
+  test.each([
+    'sort=nope',
+    'direction=up',
+    'stage=PLAYING',
+  ])('rejects %s with a 400', async query => {
+    const response = await thrown(
+      sessionsLoader(args(`http://localhost/sessions?${query}`)),
+    )
+
+    expect(response.status).toBe(400)
+    expect(get).not.toHaveBeenCalled()
   })
 
   test.each(['-1', '1.5', 'abc'])('rejects page=%s with a 400', async value => {
@@ -273,11 +322,36 @@ describe('sessionsAction: hosting', () => {
 
   test('rejects an invalid game id with a 400', async () => {
     const response = await thrown(
-      sessionsAction(args('http://localhost/sessions', {}, { gameId: 'x' })),
+      sessionsAction(args('http://localhost/sessions', {}, { gameId: 'x', playerName: 'Alice' })),
     )
 
     expect(response.status).toBe(400)
     expect(put).not.toHaveBeenCalled()
+  })
+
+  test('hosts a random playable game', async () => {
+    const game = { id: 42, title: 'Show #42', gameDate: '2024-01-01', season: '40', clueCount: 61 }
+    vi.mocked(get)
+      .mockResolvedValueOnce({ ...page(9), totalElements: 9 })
+      .mockResolvedValueOnce({ ...page(9), totalElements: 9, content: [game] })
+    vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
+    vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
+
+    const response = await sessionsAction(
+      args('http://localhost/sessions', {}, { random: 'true', playerName: 'Alice' }),
+    ) as Response
+
+    expect(get).toHaveBeenNthCalledWith(1, '/games', expect.objectContaining({
+      page: 0,
+      size: 1,
+      playable: 'true',
+    }))
+    expect(put).toHaveBeenCalledWith(
+      `/game-sessions/${SESSION_ID}`,
+      { gameId: 42 },
+      { session: SESSION_ID },
+    )
+    expect(response.headers.get('Location')).toBe(`/sessions/${SESSION_ID}`)
   })
 })
 

@@ -21,8 +21,8 @@ function JoinByCode() {
         />
       </label>
 
-      <button type="submit" disabled={isOpening}>
-        {isOpening ? 'Opening…' : 'Join with a code'}
+      <button type="submit" className="gold-button" disabled={isOpening}>
+        {isOpening ? 'Opening…' : 'Join'}
       </button>
 
       {fetcher.data?.error && (
