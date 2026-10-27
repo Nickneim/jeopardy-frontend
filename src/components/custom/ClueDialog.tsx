@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent } from 'react'
 import type { ClueType } from '../../api/clues'
+import ClueQuestion from '../ClueQuestion'
 import { CheckIcon, CrossIcon } from '../session/icons'
 import { mediaLabel } from './board'
 import { MediaBadge } from './ClueBadges'
@@ -142,7 +143,9 @@ function ClueDialog({
               {hasMedia && fields.mediaUrl?.trim() && (
                 <MediaPreview clueType={fields.clueType} url={fields.mediaUrl.trim()} />
               )}
-              <p className="custom-screen-clue">{fields.question || ' '}</p>
+              <p className="custom-screen-clue">
+                {fields.question ? <ClueQuestion html={fields.question} /> : ' '}
+              </p>
             </div>
           </div>
         </div>

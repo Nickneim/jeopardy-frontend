@@ -40,6 +40,7 @@ import {
   type HostCustomShowRequest,
 } from '../api/customShows'
 import { getRememberedPlayerName, MAX_NAME_LENGTH } from '../api/sessions'
+import ClueQuestion from '../components/ClueQuestion'
 import BlindSwitch from '../components/custom/BlindSwitch'
 import {
   problemElementId,
@@ -622,7 +623,9 @@ function CustomShowPage() {
                       )
                       : (
                         <>
-                          <span className="custom-question">{final.question}</span>
+                          <span className="custom-question">
+                            <ClueQuestion html={final.question} />
+                          </span>
                           <span className="custom-answer">{final.answer}</span>
                         </>
                       )}

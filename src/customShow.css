@@ -948,6 +948,11 @@
   overflow-wrap: anywhere;
 }
 
+/* Questions' media links and underlined titles (ClueQuestion). */
+:is(.custom-question, .custom-screen-clue) :is(u, a) {
+  color: inherit;
+}
+
 .custom-screen-media {
   max-width: 100%;
   max-height: 180px;

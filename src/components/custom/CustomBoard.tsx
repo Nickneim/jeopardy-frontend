@@ -11,6 +11,7 @@ import {
   type DraftClue,
 } from '../../api/customShows'
 import { formatMoney } from '../../format'
+import ClueQuestion from '../ClueQuestion'
 import {
   canDrop,
   categoryElementId,
@@ -291,8 +292,9 @@ function ClueCell({
           )
           : (
             <>
-              {/* As written, tags included: they only matter in play. */}
-              <span className="custom-question">{clue.question}</span>
+              <span className="custom-question">
+                <ClueQuestion html={clue.question} />
+              </span>
               <span className="custom-answer">{clue.answer}</span>
             </>
           )}

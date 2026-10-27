@@ -71,8 +71,10 @@ describe('CustomShowPage', () => {
 
     const cell = document.getElementById('custom-jeopardy-0-0')!
 
-    // Tags show as written.
-    expect(within(cell).getByText('The cousin from <i>Lisbon</i>')).toBeInTheDocument()
+    // The question's tags render, as in a live game.
+    expect(cell.querySelector('.custom-question')).toContainHTML(
+      'The cousin from <i>Lisbon</i>',
+    )
     expect(within(cell).getByText('Custom')).toBeInTheDocument()
     expect(localStorage.getItem('jeopardy.customShow')).toContain('Marta')
 

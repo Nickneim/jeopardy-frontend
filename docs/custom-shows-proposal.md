@@ -78,7 +78,7 @@ Everything else about the create is unchanged: the client picks the code, `409 S
 | Field | Rules |
 |---|---|
 | `row` | 1–5. The value comes from the row as for stored games: Jeopardy $200–$1000, Double Jeopardy $400–$2000. |
-| `question` | The clue, 1–1000 characters, stored and sent exactly as written. It may contain the same HTML tags as stored clues (`<i>`, `<br>`): the editor shows them as literal text, and only the live game renders them (§2.2). |
+| `question` | The clue, 1–1000 characters, stored and sent exactly as written. It may contain the same HTML tags as stored clues (`<i>`, `<br>`): the editor's previews and the live game render them (§2.2). |
 | `answer` | The correct response, 1–500 characters, in the §6.7 format: `(N of) A \| B`, `[A \| B]`, `(optional)`, `A/B` |
 | `clueType` | `TEXT` \| `IMAGE` \| `SOUND` \| `VIDEO` |
 | `mediaUrl` | `null` for `TEXT`; for the others an `http` or `https` URL, at most 2000 characters, **on any host** |
@@ -163,7 +163,7 @@ The frontend marks each problem on the board by its position and lists the messa
 A custom session plays exactly like a stored game. The differences are invisible to the game protocol:
 
 - **Clue ids** are made up by the backend for the session (for example 1, 2, 3… in board order), since custom clues aren't in the database. They're only used in `choose-clue` and `currentClue.clueId`, and never collide within a session.
-- **Questions are sent as written.** `currentClue.question` and `finalJeopardy.question` of a custom show contain exactly what the board had, tags included, the same as a stored game's. The backend doesn't strip, escape or validate tags. The live game renders questions as HTML, as it does today, so an imported `<i>` still shows in italics; the editor shows the same text with its tags as plain text. Replacing the HTML with something safer, or limiting which tags are allowed, is planned separately.
+- **Questions are sent as written.** `currentClue.question` and `finalJeopardy.question` of a custom show contain exactly what the board had, tags included, the same as a stored game's. The backend doesn't strip, escape or validate tags. The frontend renders questions from an allowlist of the tags stored clues use (`ClueQuestion`), in the live game and in the editor's previews, so an imported `<i>` shows in italics and any other tag shows as text.
 - `GameSessionResponse` doesn't change.
 
 ---

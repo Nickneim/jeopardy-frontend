@@ -14,6 +14,7 @@ import {
   type PageResponse,
 } from '../../api/games'
 import { formatAirDate, formatMoney } from '../../format'
+import ClueQuestion from '../ClueQuestion'
 import { CrossIcon } from '../session/icons'
 import { MediaBadge } from './ClueBadges'
 import BlindSwitch from './BlindSwitch'
@@ -376,7 +377,9 @@ function CategoryPreview({ category, round, blind }: CategoryPreviewProps) {
             )}
             {clue && !blind && (
               <>
-                <span className="custom-question">{clue.question}</span>
+                <span className="custom-question">
+                  <ClueQuestion html={clue.question} />
+                </span>
                 <span className="custom-answer">{clue.answer}</span>
               </>
             )}
@@ -407,7 +410,7 @@ function FinalPreview({ category, question, answer, used, blind }: FinalPreviewP
       <div className="custom-screen">
         {blind
           ? <span className="custom-hidden is-large" aria-label="Clue hidden"><span /><span /><span /></span>
-          : <p className="custom-screen-clue">{question}</p>}
+          : <p className="custom-screen-clue"><ClueQuestion html={question} /></p>}
         <span className="custom-label">Correct response</span>
         <span className="custom-screen-response">{blind ? 'Hidden' : answer}</span>
       </div>
