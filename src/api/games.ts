@@ -10,6 +10,8 @@ export interface GameSummary {
   gameDate: string
   season: string
   clueCount: number
+  // The Final Jeopardy category's name, null without a Final Jeopardy clue.
+  finalCategory: string | null
 }
 
 export interface PageResponse<T> {
@@ -60,6 +62,9 @@ export interface GameFilters {
   to?: string
   // 'true' to also list games without clues, which can't be played.
   includeUnplayable?: string
+  // Part of the Final Jeopardy category's name. Not a games list filter: the
+  // custom show editor searches by it.
+  finalCategory?: string
 }
 
 export const GAME_SORT_COLUMNS = [

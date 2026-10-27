@@ -5,6 +5,7 @@ import {
 } from 'react-router'
 import { get, post, put } from './client'
 import type { ClueType } from './clues'
+import type { CustomGameRequest } from './customShows'
 import { hasErrorCode } from './errors'
 import { getRandomGame, type PageResponse } from './games'
 import { pageParam, redirectPastLastPage } from './paging'
@@ -257,8 +258,13 @@ export interface GameSessionError {
 
 export interface GameSessionSummary {
   id: string
+  // Null for a custom show, whose gameTitle is the show's name.
   gameId: number | null
   gameTitle: string | null
+  // A board built in the custom show editor rather than a stored game.
+  custom: boolean
+  // Clues on the board, all rounds and Final Jeopardy.
+  clueCount: number
   // The game's season and air date ("YYYY-MM-DD"), null without a game.
   gameSeason: string | null
   gameDate: string | null
@@ -287,16 +293,23 @@ function routedTo(id: string) {
 
 const CREATE_ATTEMPTS = 5
 
+// A session is created from a stored game or a custom show, never both.
+export type CreateSessionRequest =
+  | { gameId: number }
+  | { customGame: CustomGameRequest }
+
 // The client picks the new session's code, so the create can already be
 // routed by it. A 409 means another session has that code: pick another.
-export async function createSession(gameId: number): Promise<{ id: string }> {
+export async function createSession(
+  body: CreateSessionRequest,
+): Promise<{ id: string }> {
   for (let attempt = 1; ; attempt++) {
     const id = randomSessionCode()
 
     try {
       return await put<{ id: string }>(
         `/game-sessions/${id}`,
-        { gameId },
+        body,
         routedTo(id),
       )
     } catch (error) {
@@ -598,6 +611,20 @@ export interface JoinActionData {
 
 const NAME_TOO_LONG = `Names can be at most ${MAX_NAME_LENGTH} characters.`
 
+// Why the backend would refuse this host name, or null. Checked before the
+// session exists: a name it rejects would leave an empty session behind.
+export function hostNameError(playerName: string): string | null {
+  if (!playerName) {
+    return 'Enter your name to host.'
+  }
+
+  if (textLength(playerName) > MAX_NAME_LENGTH) {
+    return NAME_TOO_LONG
+  }
+
+  return null
+}
+
 // Hosting is creating a session and joining it as its first player, who
 // becomes the host.
 async function createSessionAction({
@@ -605,16 +632,11 @@ async function createSessionAction({
 }: ActionFunctionArgs): Promise<JoinActionData | Response> {
   const formData = await request.formData()
   const random = formData.get('random') === 'true'
-  // Checked like the backend will, before the session exists: a name it
-  // rejects would leave an empty session behind.
   const playerName = cleanPlayerName(String(formData.get('playerName') ?? ''))
+  const nameError = hostNameError(playerName)
 
-  if (!playerName) {
-    return { error: 'Enter your name to host.' }
-  }
-
-  if (textLength(playerName) > MAX_NAME_LENGTH) {
-    return { error: NAME_TOO_LONG }
+  if (nameError) {
+    return { error: nameError }
   }
 
   // "Host a random game" picks it only now, with a valid name.
@@ -631,7 +653,7 @@ async function createSessionAction({
   let id: string
 
   try {
-    ({ id } = await createSession(gameId))
+    ({ id } = await createSession({ gameId }))
   } catch (error) {
     // The message says why, e.g. a clue no answer could match.
     if (hasErrorCode(error, 'UNPLAYABLE_GAME')) {
@@ -704,7 +726,7 @@ export async function joinSessionAction({
 
 // Joins and keeps the token. Returns null on success, or the error to show
 // on the form.
-async function joinAsPlayer(
+export async function joinAsPlayer(
   id: string,
   playerName: string,
 ): Promise<JoinActionData | null> {

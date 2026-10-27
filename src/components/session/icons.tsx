@@ -3,11 +3,11 @@ import type { ReactNode } from 'react'
 // Small stroke icons for the live game's buttons. Decorative: the buttons
 // carry their own text or aria-label.
 
-interface IconProps {
+export interface IconProps {
   size?: number
 }
 
-function Icon({
+export function Icon({
   size = 20,
   children,
 }: IconProps & { children: ReactNode }) {

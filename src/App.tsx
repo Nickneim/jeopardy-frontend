@@ -12,6 +12,7 @@ function App() {
         <nav className="site-nav">
           <Link to="/" className="site-logo" aria-label="Home">J!</Link>
           <NavLink to="/games">Catalog</NavLink>
+          <NavLink to="/custom">Custom show</NavLink>
           <NavLink to="/sessions" end>Live games</NavLink>
         </nav>
       )}

@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage'
 import GamesPage from './pages/GamesPage'
 import GamePage from './pages/GamePage'
 import CluePage from './pages/CluePage'
+import CustomShowPage from './pages/CustomShowPage'
 import ErrorPage from './pages/ErrorPage'
 import LoadingPage from './pages/LoadingPage'
 import SessionPage from './pages/SessionPage'
@@ -13,6 +14,7 @@ import {
   gameLoader,
 } from './api/games'
 import { clueLoader } from './api/clues'
+import { customShowAction } from './api/customShows'
 import {
   homeLoader,
   joinSessionAction,
@@ -48,6 +50,12 @@ const router = createBrowserRouter([
         path: 'clues/:id',
         element: <CluePage />,
         loader: clueLoader,
+      },
+      {
+        // The draft is in localStorage: no loader.
+        path: 'custom',
+        element: <CustomShowPage />,
+        action: customShowAction,
       },
       {
         path: 'sessions',

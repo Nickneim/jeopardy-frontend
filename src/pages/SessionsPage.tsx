@@ -124,7 +124,16 @@ function SessionsPage() {
             {sessions.content.map(session => (
               <tr key={session.id}>
                 <td className="cell-code">{session.id}</td>
-                <td className="cell-title">{session.gameTitle ?? 'Untitled game'}</td>
+                <td className="cell-title">
+                  {session.gameTitle ?? 'Untitled game'}
+                  {session.custom && (
+                    <>
+                      {' '}
+                      <span className="custom-show-badge">Custom</span>
+                      <span className="cell-note">Custom show · {session.clueCount} clues</span>
+                    </>
+                  )}
+                </td>
                 <td className="cell-season">{session.gameSeason ?? '—'}</td>
                 <td className="cell-nowrap">
                   {session.gameDate ? formatAirDate(session.gameDate) : '—'}

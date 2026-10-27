@@ -35,6 +35,11 @@ function HomePage() {
           <span className="home-tile-title is-gold">Host a show</span>
         </Link>
 
+        <Link to="/custom" className="home-tile">
+          <span className="home-kicker">Build your own</span>
+          <span className="home-tile-title is-gold">Host a custom show</span>
+        </Link>
+
         <section className="home-tile" aria-labelledby="home-join">
           <span className="home-kicker">Got a code?</span>
           <h2 id="home-join" className="home-tile-title is-gold">

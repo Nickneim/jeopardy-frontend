@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { CustomGameProblem } from './customShows'
 import { ApiError, type ApiErrorCode } from './errors'
 import type { GameErrorCode } from './sessions'
 
@@ -8,6 +9,8 @@ interface ApiErrorResponse {
   status: number
   code?: ApiErrorCode | GameErrorCode
   message?: string
+  // Only with INVALID_CUSTOM_GAME.
+  problems?: CustomGameProblem[]
 }
 
 const apiClient = axios.create({
@@ -26,6 +29,7 @@ async function request<T>(send: () => Promise<{ data: T }>): Promise<T> {
         apiError?.status ?? error.response?.status ?? 0,
         apiError?.message ?? error.message,
         apiError?.code ?? null,
+        apiError?.problems ?? [],
       )
     }
 

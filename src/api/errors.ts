@@ -1,3 +1,4 @@
+import type { CustomGameProblem } from './customShows'
 import type { GameErrorCode } from './sessions'
 
 // What went wrong, in an ApiErrorResponse (api.md §3). React to it rather
@@ -7,6 +8,7 @@ export type ApiErrorCode =
   | 'GAME_NOT_FOUND'
   | 'CLUE_NOT_FOUND'
   | 'UNPLAYABLE_GAME'
+  | 'INVALID_CUSTOM_GAME'
   | 'SESSION_ALREADY_EXISTS'
   | 'SESSION_NOT_JOINABLE'
 
@@ -15,15 +17,19 @@ export class ApiError extends Error {
   // Null without an ApiErrorResponse body: no response, a proxy's error
   // page, or Spring's default body for an unexpected error.
   code: ApiErrorCode | GameErrorCode | null;
+  // Why a custom show can't be played (INVALID_CUSTOM_GAME), otherwise [].
+  problems: CustomGameProblem[];
   constructor(
     status: number,
     message: string,
     code: ApiErrorCode | GameErrorCode | null = null,
+    problems: CustomGameProblem[] = [],
   ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.problems = problems
   }
 }
 
