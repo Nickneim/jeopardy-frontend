@@ -784,6 +784,15 @@ a.home-tile:hover {
   color: inherit;
 }
 
+/* Clue questions' <big> and <span class="nobreak"> (ClueQuestion). */
+.clue-big {
+  font-size: larger;
+}
+
+.clue-nobreak {
+  white-space: nowrap;
+}
+
 .board-response-label {
   font-size: 11px;
   letter-spacing: 0.16em;

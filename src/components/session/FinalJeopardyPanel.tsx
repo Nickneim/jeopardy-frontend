@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   getSentFinalJeopardy,
   rememberSentFinalJeopardy,
@@ -7,8 +7,8 @@ import {
   type SentFinalJeopardy,
 } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
-import { sanitizeClueHtml } from '../../clueHtml'
 import { formatMoney } from '../../format'
+import ClueQuestion from '../ClueQuestion'
 import AnswerForm from './AnswerForm'
 import CorrectResponse from './CorrectResponse'
 import FinalReveal from './FinalReveal'
@@ -39,12 +39,6 @@ function FinalJeopardyPanel({
   const myAnswer = sent.answer
 
   const final = session.finalJeopardy
-  const question = final?.question ?? null
-  // The page re-renders with every countdown tick: clean the HTML once.
-  const questionHtml = useMemo(
-    () => question && sanitizeClueHtml(question),
-    [question],
-  )
 
   if (!final) {
     return null
@@ -98,12 +92,11 @@ function FinalJeopardyPanel({
         </div>
       )}
 
-      {questionHtml && (
+      {final.question && (
         <div className={isRevealing ? 'tv-question-box is-small' : 'tv-question-box'}>
-          <p
-            className="tv-question"
-            dangerouslySetInnerHTML={{ __html: questionHtml }}
-          />
+          <p className="tv-question">
+            <ClueQuestion html={final.question} />
+          </p>
         </div>
       )}
 

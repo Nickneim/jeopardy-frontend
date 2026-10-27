@@ -1,7 +1,7 @@
 import type { GameCategory, GameClue } from '../api/games'
-import { sanitizeClueHtml } from '../clueHtml'
 import { formatCorrectResponse } from '../format'
 import ClueMedia from './ClueMedia'
+import ClueQuestion from './ClueQuestion'
 
 interface GameBoardProps {
   categories: GameCategory[]
@@ -131,10 +131,9 @@ export function ClueCard({
             </>
           )
           : (
-            <span
-              className="board-question"
-              dangerouslySetInnerHTML={{ __html: sanitizeClueHtml(clue.question) }}
-            />
+            <span className="board-question">
+              <ClueQuestion html={clue.question} />
+            </span>
           )}
       </button>
 

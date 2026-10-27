@@ -1,9 +1,8 @@
-import { useMemo } from 'react'
 import { clueAnswersRound, type GameSession, type Player } from '../../api/sessions'
 import type { SessionActions } from '../../hooks/useGameSession'
-import { sanitizeClueHtml } from '../../clueHtml'
 import { formatMoney } from '../../format'
 import ClueMedia from '../ClueMedia'
+import ClueQuestion from '../ClueQuestion'
 import AnswerForm from './AnswerForm'
 import ClueAnswers from './ClueAnswers'
 import CorrectResponse from './CorrectResponse'
@@ -23,12 +22,6 @@ function CluePanel({
   actions,
 }: CluePanelProps) {
   const clue = session.currentClue
-  const question = clue?.question ?? null
-  // The page re-renders with every countdown tick: clean the HTML once.
-  const questionHtml = useMemo(
-    () => question && sanitizeClueHtml(question),
-    [question],
-  )
 
   if (!clue) {
     return null
@@ -101,16 +94,15 @@ function CluePanel({
           <>
             <ClueMedia clueType={clue.clueType} mediaUrl={clue.mediaUrl} />
 
-            {questionHtml && (
+            {clue.question && (
               <div
                 className={isRevealing || hasAnswers
                   ? 'tv-question-box is-small'
                   : 'tv-question-box'}
               >
-                <p
-                  className="tv-question"
-                  dangerouslySetInnerHTML={{ __html: questionHtml }}
-                />
+                <p className="tv-question">
+                  <ClueQuestion html={clue.question} />
+                </p>
               </div>
             )}
 
