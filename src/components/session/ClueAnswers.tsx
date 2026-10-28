@@ -29,9 +29,11 @@ function ClueAnswers({
 
   // The question form is optional in the Jeopardy round, so a player who left
   // it out is only warned. From Double Jeopardy on it explains a wrong answer.
+  // Trebek rules on the question form too, so nothing is said about it.
   const questionRequired = round !== 'JEOPARDY'
   const warnMe = !questionRequired && me !== null && answers.some(answer =>
-    answer.playerId === me.id && answer.phrasedAsQuestion === false)
+    answer.playerId === me.id && !answer.ruledByTrebek &&
+    answer.phrasedAsQuestion === false)
 
   return (
     <>
@@ -49,9 +51,9 @@ function ClueAnswers({
 
             <span className="clue-answer-text">
               {answer.answer === null
-                ? <em>ran out of time</em>
+                ? <em>{answer.ruledByTrebek ? 'nothing typed' : 'ran out of time'}</em>
                 : answer.answer}
-              {questionRequired && !answer.correct &&
+              {questionRequired && !answer.correct && !answer.ruledByTrebek &&
                 answer.phrasedAsQuestion === false && (
                 <em> (not phrased as a question)</em>
               )}

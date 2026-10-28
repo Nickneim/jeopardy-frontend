@@ -4,6 +4,8 @@ import { formatMoney } from '../../format'
 interface WagerFormProps {
   min: number
   max: number
+  // The field's label, "Your wager" by default.
+  label?: string
   // What the field starts with (a wager already placed), `min` by default.
   initialWager?: number | null
   submitLabel: string
@@ -19,6 +21,7 @@ interface WagerFormProps {
 function WagerForm({
   min,
   max,
+  label = 'Your wager',
   initialWager = null,
   submitLabel,
   allIn = false,
@@ -47,7 +50,7 @@ function WagerForm({
 
   return (
     <form className="tv-form" onSubmit={handleSubmit}>
-      <label htmlFor={inputId} className="tv-form-label">Your wager</label>
+      <label htmlFor={inputId} className="tv-form-label">{label}</label>
 
       <div className="tv-form-row">
         <span className="tv-money-input">

@@ -1,6 +1,7 @@
 // Shared helpers for the end-to-end scripts. They run against the real
 // backend through the Vite dev server, the same way the app does.
 import { randomInt } from 'node:crypto'
+import { Client } from '@stomp/stompjs'
 
 export const APP = process.env.APP_URL ?? 'http://localhost:5173'
 
@@ -73,4 +74,56 @@ export async function preflight() {
   }
 
   return gameId
+}
+
+// One connection per session: the session in the URL routes it.
+const wsUrl = sessionId =>
+  `${APP.replace(/^http/, 'ws')}/ws?session=${encodeURIComponent(sessionId)}`
+
+// A STOMP connection like useGameSession's: records snapshots, errors,
+// Trebek's private views (only Trebek's connection gets any) and ERROR
+// frames, and whether CONNECT completed.
+export function connect(sessionId, token) {
+  const conn = {
+    snapshots: [], errors: [], trebekViews: [], stompErrors: [], connected: false,
+    latest: () => conn.snapshots.reduce(
+      (a, b) => (!a || b.version > a.version ? b : a), null),
+  }
+  const client = new Client({
+    brokerURL: wsUrl(sessionId),
+    connectHeaders: token ? { 'player-token': token } : {},
+    reconnectDelay: 0,
+    onConnect: () => {
+      conn.connected = true
+      client.subscribe(`/topic/sessions/${sessionId}`,
+        f => conn.snapshots.push(JSON.parse(f.body)))
+      if (token) {
+        client.subscribe('/user/queue/errors',
+          f => conn.errors.push(JSON.parse(f.body)))
+        client.subscribe('/user/queue/trebek',
+          f => conn.trebekViews.push(JSON.parse(f.body)))
+      }
+    },
+    onStompError: f => {
+      conn.stompErrors.push({ afterConnect: conn.connected, message: f.headers.message })
+      void client.deactivate()
+    },
+  })
+  conn.client = client
+  conn.send = (action, body) => client.publish({
+    destination: `/app/sessions/${sessionId}/${action}`,
+    headers: { 'content-type': 'application/json' },
+    body: body ? JSON.stringify(body) : '',
+  })
+  client.activate()
+  return conn
+}
+
+export async function waitFor(fn, ms = 3000) {
+  const end = Date.now() + ms
+  while (Date.now() < end) {
+    if (fn()) return true
+    await sleep(50)
+  }
+  return false
 }

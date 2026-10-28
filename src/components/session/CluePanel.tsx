@@ -14,8 +14,9 @@ interface CluePanelProps {
   actions: SessionActions
 }
 
-// The main screen while a clue is in play: from a Daily Double's wager to
-// the answer reveal. Buzzing is on the player's podium.
+// The main screen while a clue is in play: from the pick (in a Trebek game)
+// or a Daily Double's wager to the answer reveal. Buzzing is on the
+// player's podium. Trebek sees this too, with their desk beside it.
 function CluePanel({
   session,
   me,
@@ -35,6 +36,8 @@ function CluePanel({
     return session.players.find(player => player.id === id)?.name ?? 'Someone'
   }
 
+  const trebekName = session.trebek?.name ?? 'Trebek'
+  const isPicked = session.state === 'CLUE_PICKED'
   const isWagering = session.state === 'WAITING_FOR_DAILY_DOUBLE_WAGER'
   const isMyWager = me !== null && isWagering &&
     session.playerChoosingClue === me.id
@@ -43,7 +46,24 @@ function CluePanel({
     session.state === 'WAITING_FOR_ANSWER' &&
     session.playerAnswering === me.id
   const isRevealing = session.state === 'REVEALING_ANSWER'
+  const isRuling = session.state === 'WAITING_FOR_RULING'
   const hasAnswers = session.clueAnswers.length > 0
+
+  if (isPicked) {
+    return (
+      <>
+        <p className="tv-heading">
+          <span>{category?.name}</span>
+          <span className="tv-gold">{formatMoney(clue.value)}</span>
+        </p>
+
+        <p className="tv-waiting">
+          <span className="tv-hand">{trebekName}</span>
+          <span>is about to show the clue…</span>
+        </p>
+      </>
+    )
+  }
 
   return (
     <>
@@ -129,6 +149,17 @@ function CluePanel({
                 once
                 onSubmit={actions.answer}
               />
+            )}
+
+            {isRuling && (
+              <p className="tv-waiting">
+                <span className="tv-hand">{trebekName}</span>
+                <span>
+                  {me !== null && session.playerAnswering === me.id
+                    ? 'is ruling on your answer…'
+                    : `is ruling on ${playerName(session.playerAnswering)}'s answer…`}
+                </span>
+              </p>
             )}
 
             {session.state === 'WAITING_FOR_ANSWER' && !isMyAnswer && (

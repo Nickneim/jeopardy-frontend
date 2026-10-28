@@ -32,7 +32,9 @@ function finalJeopardy(state: GameSession['state']): GameSession {
         phrasedAsQuestion: null,
         matchedAnswers: null,
         alsoAccepted: null,
+        revealStep: null,
       }],
+      revealOrder: null,
     },
   })
 }
@@ -121,6 +123,7 @@ describe('FinalJeopardyPanel', () => {
       phrasedAsQuestion: true,
       matchedAnswers: matched,
       alsoAccepted: matched && [],
+      revealStep: null,
     })
     const session = makeSession({
       state: 'FINAL_JEOPARDY_REVEALING',
@@ -137,6 +140,7 @@ describe('FinalJeopardyPanel', () => {
           revealed(1, 'What is Myanmar?', ['Myanmar']),
           revealed(2, 'What is Burma?', ['Burma']),
         ],
+        revealOrder: null,
       },
     })
 

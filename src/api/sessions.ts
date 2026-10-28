@@ -17,10 +17,14 @@ export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
 export type GameSessionState =
   | 'WAITING_FOR_START'
   | 'CHOOSING_CLUE'
+  // Trebek sessions: a clue was chosen and Trebek hasn't shown it.
+  | 'CLUE_PICKED'
   | 'WAITING_FOR_DAILY_DOUBLE_WAGER'
   | 'REVEALING_CLUE'
   | 'WAITING_FOR_BUZZER'
   | 'WAITING_FOR_ANSWER'
+  // Trebek sessions: the answer is in and Trebek hasn't ruled.
+  | 'WAITING_FOR_RULING'
   | 'REVEALING_ANSWER'
   | 'FINAL_JEOPARDY_WAGERING'
   | 'FINAL_JEOPARDY_ANSWERING'
@@ -29,7 +33,17 @@ export type GameSessionState =
   // Only in a removed session's last broadcast.
   | 'CLOSED'
 
-export type SessionCloseReason = 'ABANDONED' | 'IDLE' | 'FINISHED'
+export type SessionCloseReason =
+  | 'ABANDONED'
+  | 'IDLE'
+  | 'FINISHED'
+  // Trebek left during the game, which ends it.
+  | 'TREBEK_LEFT'
+
+// TREBEK: the host runs the show instead of playing (api.md §6.8).
+export type HostMode = 'CONTESTANT' | 'TREBEK'
+// TREBEK: the phase has no timer and waits for Trebek's advance.
+export type TimerMode = 'AUTOMATIC' | 'TREBEK'
 
 export type GameErrorCode =
   | 'SESSION_NOT_FOUND'
@@ -46,6 +60,14 @@ export type GameErrorCode =
   | 'NOT_HOST'
   | 'PLAYER_NOT_FOUND'
   | 'INTERNAL_ERROR'
+
+// The host running a Trebek session. Never in `players`.
+export interface Trebek {
+  // Also the session's hostPlayerId.
+  id: number
+  name: string
+  away: boolean
+}
 
 export interface Player {
   id: number
@@ -88,6 +110,22 @@ export interface SessionTimers {
   finalJeopardyRevealMs: number
 }
 
+// Which phases wait for Trebek, keyed like SessionTimers.
+export type SessionTimerModes = Record<keyof SessionTimers, TimerMode>
+
+// Every session starts with these (api.md §6.8).
+export const DEFAULT_TIMER_MODES: SessionTimerModes = {
+  clueChoiceMs: 'AUTOMATIC',
+  clueRevealMs: 'TREBEK',
+  dailyDoubleWagerMs: 'TREBEK',
+  buzzerMs: 'AUTOMATIC',
+  answerMs: 'AUTOMATIC',
+  answerRevealMs: 'TREBEK',
+  finalJeopardyWagerMs: 'AUTOMATIC',
+  finalJeopardyAnswerMs: 'AUTOMATIC',
+  finalJeopardyRevealMs: 'TREBEK',
+}
+
 export const MIN_TIMER_MS = 1000
 export const MAX_TIMER_MS = 300000
 
@@ -122,7 +160,8 @@ export interface BoardCategory {
 export interface CurrentClue {
   clueId: number
   value: number
-  dailyDouble: boolean
+  // Null in CLUE_PICKED, so the board doesn't give a Daily Double away.
+  dailyDouble: boolean | null
   wager: number | null
   // The chooser's allowed wager, only while wagering on a Daily Double.
   minWager: number | null
@@ -155,7 +194,15 @@ export interface ClueAnswer {
   matchedAnswers: string[] | null
   // Correct answers only: a list's options it didn't name, [] if not a list.
   alsoAccepted: string[] | null
+  // `correct` is Trebek's ruling. In a Trebek session the two fields above
+  // are only set when the ruling is correct and the check matched it.
+  ruledByTrebek: boolean
 }
+
+// How far a player's Final Jeopardy reveal has got in a Trebek session:
+// their wager is shown from WAGER, their answer from ANSWER, and once
+// AWARDED their result, already applied to their score.
+export type FinalRevealStep = 'HIDDEN' | 'WAGER' | 'ANSWER' | 'AWARDED'
 
 export interface FinalJeopardyPlayer {
   playerId: number
@@ -172,6 +219,8 @@ export interface FinalJeopardyPlayer {
   // Revealed, correct answers only (as in ClueAnswer).
   matchedAnswers: string[] | null
   alsoAccepted: string[] | null
+  // Trebek sessions, from FINAL_JEOPARDY_REVEALING on.
+  revealStep: FinalRevealStep | null
 }
 
 export interface FinalJeopardy {
@@ -185,6 +234,9 @@ export interface FinalJeopardy {
   // Revealed with `answer`, ready to show (formatAcceptedAnswers).
   acceptedAnswers: AcceptedAnswers | null
   players: FinalJeopardyPlayer[]
+  // Trebek sessions, from FINAL_JEOPARDY_REVEALING on: the player ids in the
+  // order they're revealed.
+  revealOrder: number[] | null
 }
 
 export interface GameSession {
@@ -194,14 +246,24 @@ export interface GameSession {
   state: GameSessionState
   closeReason: SessionCloseReason | null
   phaseDurationMs: number | null
+  // Frozen while `paused`.
   phaseRemainingMs: number | null
+  // Trebek stopped the clock: don't count down.
+  paused: boolean
   timers: SessionTimers
+  // Only matter in a Trebek session.
+  timerModes: SessionTimerModes
+  hostMode: HostMode
+  // Null in a CONTESTANT session.
+  trebek: Trebek | null
   // Whether players can join after the start. Only the host changes it,
   // before the start.
   allowLateJoin: boolean
   // The score a player who joins now starts with, never above 0.
   joinScore: number
+  // Never Trebek.
   players: Player[]
+  // trebek.id in a Trebek session.
   hostPlayerId: number | null
   playerChoosingClue: number | null
   playerAnswering: number | null
@@ -225,15 +287,102 @@ export function clueAnswersRound(session: GameSession): GameRound {
     : session.round
 }
 
-// Whether nobody else is still playing, so this player leaving closes the
-// session. A finished game's results stay until it times out.
-export function isLastPlayer(
+export function isTrebek(
   session: GameSession,
   playerId: number | undefined,
 ): boolean {
-  return session.state !== 'FINISHED_GAME' &&
-    !session.players.some(p => p.id !== playerId && !p.leaving)
+  return session.trebek !== null && session.trebek.id === playerId
 }
+
+// Whether this player leaving closes the session: nobody else is still
+// playing, or Trebek leaves during the game, which ends it. Trebek can wait
+// alone in the lobby, and a finished game's results stay until it times out.
+export function leavingClosesSession(
+  session: GameSession,
+  playerId: number | undefined,
+): boolean {
+  const state = session.state
+  const othersStay = session.players
+    .some(p => p.id !== playerId && !p.leaving)
+
+  if (state === 'FINISHED_GAME') {
+    return false
+  }
+
+  if (isTrebek(session, playerId)) {
+    return state !== 'WAITING_FOR_START' || !othersStay
+  }
+
+  return !othersStay && !(state === 'WAITING_FOR_START' && session.trebek)
+}
+
+// What the host can change in the lobby, at least one of them.
+export interface UpdateSettingsRequest {
+  allowLateJoin?: boolean
+  hostMode?: HostMode
+  timerModes?: Partial<SessionTimerModes>
+}
+
+// ---------- Trebek's private view (/user/queue/trebek, api.md §6.8) ----------
+
+// The clue in play, from CLUE_PICKED until its answer reveal ends.
+export interface TrebekClue {
+  clueId: number
+  value: number
+  dailyDouble: boolean
+  categoryName: string
+  question: string
+  clueType: ClueType
+  mediaUrl: string | null
+  numberExpected: boolean
+  // Written as in api.md §6.7. Show acceptedAnswers instead.
+  answer: string
+  acceptedAnswers: AcceptedAnswers
+}
+
+// In WAITING_FOR_RULING: what the answering player submitted.
+export interface TrebekPendingAnswer {
+  playerId: number
+  // Null: nothing was submitted.
+  answer: string | null
+  // What a CONTESTANT session would have scored.
+  suggestedCorrect: boolean
+  phrasedAsQuestion: boolean | null
+  // Only when suggestedCorrect.
+  matchedAnswers: string[] | null
+}
+
+export interface TrebekFinalPlayer {
+  playerId: number
+  // Null while wagering until they wager; then 0 if they didn't.
+  wager: number | null
+  answer: string | null
+  // Null until there's an answer or answering closes.
+  suggestedCorrect: boolean | null
+  phrasedAsQuestion: boolean | null
+  matchedAnswers: string[] | null
+  // Null: Trebek hasn't ruled yet.
+  ruling: boolean | null
+}
+
+export interface TrebekFinalJeopardy {
+  question: string
+  answer: string
+  acceptedAnswers: AcceptedAnswers
+  numberExpected: boolean
+  players: TrebekFinalPlayer[]
+}
+
+// The secrets only Trebek sees, for the snapshot with the same version.
+export interface TrebekView {
+  version: number
+  clue: TrebekClue | null
+  pendingAnswer: TrebekPendingAnswer | null
+  finalJeopardy: TrebekFinalJeopardy | null
+}
+
+// adjust-score's limit, either way, per call.
+export const MAX_SCORE_ADJUSTMENT = 100000
 
 // Whether a join would be accepted now, like the live games list's
 // `joinable`: never once Final Jeopardy's wagering is over (api.md §6.6).
@@ -270,8 +419,12 @@ export interface GameSessionSummary {
   gameDate: string | null
   state: GameSessionState
   round: GameRound
+  // Players who haven't left, never Trebek.
   playerCount: number
+  // Trebek's name in a Trebek session.
   hostName: string | null
+  // TREBEK: the host runs the show, marked in the list.
+  hostMode: HostMode
   createdAt: string
   // Whether a join would be accepted right now.
   joinable: boolean

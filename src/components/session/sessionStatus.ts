@@ -10,8 +10,14 @@ export interface SessionStatus {
 export function sessionStatus(
   session: GameSession,
   me: Player | null,
+  // Trebek is watching: tell them what the game waits for.
+  isTrebek = false,
 ): SessionStatus {
   function name(id: number | null): string {
+    if (session.trebek && session.trebek.id === id) {
+      return session.trebek.name
+    }
+
     return session.players.find(player => player.id === id)?.name ?? 'Someone'
   }
 
@@ -23,8 +29,12 @@ export function sessionStatus(
 
   switch (session.state) {
     case 'WAITING_FOR_START':
-      if (session.hostPlayerId === null) {
+      if (session.hostPlayerId === null ||
+        (isTrebek && session.players.length === 0)) {
         return { who: null, message: 'Waiting for players to join' }
+      }
+      if (isTrebek) {
+        return { who: null, message: 'Start the game when everyone is here' }
       }
       return isMe(session.hostPlayerId)
         ? { who: null, message: 'Start the game when everyone is here' }
@@ -34,6 +44,11 @@ export function sessionStatus(
       return isMe(chooser)
         ? { who: null, message: 'Your pick · choose a clue' }
         : { who: name(chooser), message: 'is choosing a clue' }
+
+    case 'CLUE_PICKED':
+      return isTrebek
+        ? { who: name(chooser), message: "picked a clue · show it when you're ready" }
+        : { who: name(session.hostPlayerId), message: 'is about to show the clue' }
 
     case 'WAITING_FOR_DAILY_DOUBLE_WAGER':
       return isMe(chooser)
@@ -66,6 +81,17 @@ export function sessionStatus(
       return isMe(session.playerAnswering)
         ? { who: null, message: 'Your answer' }
         : { who: name(session.playerAnswering), message: 'is answering' }
+
+    case 'WAITING_FOR_RULING':
+      if (isTrebek) {
+        return { who: null, message: `Rule on ${name(session.playerAnswering)}'s answer` }
+      }
+      return {
+        who: name(session.hostPlayerId),
+        message: isMe(session.playerAnswering)
+          ? 'is ruling on your answer'
+          : `is ruling on ${name(session.playerAnswering)}'s answer`,
+      }
 
     case 'REVEALING_ANSWER':
       if (chooser === null) {

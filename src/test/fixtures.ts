@@ -1,4 +1,4 @@
-import type { GameSession, Player } from '../api/sessions'
+import { DEFAULT_TIMER_MODES, type GameSession, type Player } from '../api/sessions'
 
 export const SESSION_ID = '7KQ2M'
 
@@ -34,6 +34,10 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
       finalJeopardyAnswerMs: 30000,
       finalJeopardyRevealMs: 10000,
     },
+    paused: false,
+    timerModes: DEFAULT_TIMER_MODES,
+    hostMode: 'CONTESTANT',
+    trebek: null,
     allowLateJoin: true,
     joinScore: 0,
     players: [],

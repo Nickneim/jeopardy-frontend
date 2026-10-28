@@ -24,7 +24,7 @@ describe('sessionStatus', () => {
       state: 'WAITING_FOR_BUZZER',
       players: [alice, bob],
       playersLockedOut: [2],
-      clueAnswers: [{ playerId: 2, answer: 'Paris', correct: false, phrasedAsQuestion: false, matchedAnswers: null, alsoAccepted: null }],
+      clueAnswers: [{ playerId: 2, answer: 'Paris', correct: false, phrasedAsQuestion: false, matchedAnswers: null, alsoAccepted: null, ruledByTrebek: false }],
     })
 
     expect(sessionStatus(session, alice).message).toBe('Still open · buzz in now')
@@ -41,5 +41,24 @@ describe('sessionStatus', () => {
 
     expect(sessionStatus(session, alice)).toEqual({ who: 'Bob', message: 'is answering' })
     expect(sessionStatus(session, bob)).toEqual({ who: null, message: 'Your answer' })
+  })
+
+  test('says what a Trebek game waits for, to Trebek and the players', () => {
+    const trebek = { id: 9, name: 'Alex', away: false }
+    const base = { hostMode: 'TREBEK' as const, trebek, hostPlayerId: 9, players: [alice, bob] }
+
+    const picked = makeSession({ ...base, state: 'CLUE_PICKED', playerChoosingClue: 1 })
+    expect(sessionStatus(picked, alice))
+      .toEqual({ who: 'Alex', message: 'is about to show the clue' })
+    expect(sessionStatus(picked, null, true))
+      .toEqual({ who: 'Alice', message: "picked a clue · show it when you're ready" })
+
+    const ruling = makeSession({ ...base, state: 'WAITING_FOR_RULING', playerAnswering: 2 })
+    expect(sessionStatus(ruling, bob))
+      .toEqual({ who: 'Alex', message: 'is ruling on your answer' })
+    expect(sessionStatus(ruling, alice))
+      .toEqual({ who: 'Alex', message: "is ruling on Bob's answer" })
+    expect(sessionStatus(ruling, null, true))
+      .toEqual({ who: null, message: "Rule on Bob's answer" })
   })
 })

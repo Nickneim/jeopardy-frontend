@@ -19,6 +19,7 @@ function result(
     phrasedAsQuestion: true,
     matchedAnswers: correct ? ['Budapest'] : null,
     alsoAccepted: correct ? [] : null,
+    revealStep: null,
   }
 }
 
@@ -41,6 +42,7 @@ const session = makeSession({
     answer: 'Budapest',
     acceptedAnswers: { required: 1, options: ['Budapest'] },
     players: [result(1, 500, false), result(2, 100, false), result(3, 1000, true)],
+    revealOrder: null,
   },
 })
 
@@ -78,5 +80,30 @@ describe('finalRevealProgress', () => {
   test('is null outside the reveal', () => {
     expect(finalRevealProgress({ ...session, state: 'FINAL_JEOPARDY_ANSWERING' }, 5000))
       .toBeNull()
+  })
+
+  test("follows each player's reveal step in a Trebek game", () => {
+    const final = session.finalJeopardy!
+    const trebekSession = (steps: Record<number, FinalJeopardyPlayer['revealStep']>) => ({
+      ...session,
+      // A clock waiting for Trebek has no duration.
+      phaseDurationMs: null,
+      phaseRemainingMs: null,
+      finalJeopardy: {
+        ...final,
+        revealOrder: [2, 3, 1],
+        players: final.players.map(p => ({ ...p, revealStep: steps[p.playerId] })),
+      },
+    })
+
+    expect(finalRevealProgress(trebekSession({ 1: 'HIDDEN', 2: 'HIDDEN', 3: 'HIDDEN' }), null))
+      .toMatchObject({ index: 0, step: 'hidden', showCorrectResponse: false })
+    expect(finalRevealProgress(trebekSession({ 1: 'HIDDEN', 2: 'AWARDED', 3: 'ANSWER' }), null))
+      .toMatchObject({ index: 1, step: 'response' })
+
+    const done = finalRevealProgress(trebekSession({ 1: 'AWARDED', 2: 'AWARDED', 3: 'AWARDED' }), null)
+    expect(done).toMatchObject({ index: 2, step: 'result', showCorrectResponse: true })
+    // The server applies each award itself.
+    expect(done?.scores.size).toBe(0)
   })
 })

@@ -3,68 +3,20 @@
 // joining, leave, host handover and cleanup.
 //
 //   node scripts/e2e/session-flow.mjs     (GAME_ID=735 to pick the game)
-import { Client } from '@stomp/stompjs'
 import {
   api,
-  APP,
   check,
+  connect,
   createSession,
   finish,
   preflight,
   randomSessionCode,
   sessionPath,
   sleep,
+  waitFor,
 } from './lib.mjs'
 
-// One connection per session: the session in the URL routes it.
-const wsUrl = sessionId =>
-  `${APP.replace(/^http/, 'ws')}/ws?session=${encodeURIComponent(sessionId)}`
 const GAME_ID = await preflight()
-
-// A STOMP connection like useGameSession's: records snapshots, errors and
-// ERROR frames, and whether CONNECT completed.
-function connect(sessionId, token) {
-  const conn = {
-    snapshots: [], errors: [], stompErrors: [], connected: false,
-    latest: () => conn.snapshots.reduce(
-      (a, b) => (!a || b.version > a.version ? b : a), null),
-  }
-  const client = new Client({
-    brokerURL: wsUrl(sessionId),
-    connectHeaders: token ? { 'player-token': token } : {},
-    reconnectDelay: 0,
-    onConnect: () => {
-      conn.connected = true
-      client.subscribe(`/topic/sessions/${sessionId}`,
-        f => conn.snapshots.push(JSON.parse(f.body)))
-      if (token) {
-        client.subscribe('/user/queue/errors',
-          f => conn.errors.push(JSON.parse(f.body)))
-      }
-    },
-    onStompError: f => {
-      conn.stompErrors.push({ afterConnect: conn.connected, message: f.headers.message })
-      void client.deactivate()
-    },
-  })
-  conn.client = client
-  conn.send = (action, body) => client.publish({
-    destination: `/app/sessions/${sessionId}/${action}`,
-    headers: { 'content-type': 'application/json' },
-    body: body ? JSON.stringify(body) : '',
-  })
-  client.activate()
-  return conn
-}
-
-async function waitFor(fn, ms = 3000) {
-  const end = Date.now() + ms
-  while (Date.now() < end) {
-    if (fn()) return true
-    await sleep(50)
-  }
-  return false
-}
 
 async function main() {
   const id = randomSessionCode()

@@ -1,9 +1,9 @@
 import type { FinalJeopardy, Player } from '../../api/sessions'
 import { formatMoney } from '../../format'
-import type { FinalRevealProgress, FinalRevealStep } from './revealProgress'
+import type { FinalRevealProgress, RevealShown } from './revealProgress'
 import { CheckIcon, CrossIcon } from './icons'
 
-const STEPS: FinalRevealStep[] = ['wager', 'response', 'result']
+const STEPS: RevealShown[] = ['wager', 'response', 'result']
 
 interface FinalRevealProps {
   players: Player[]

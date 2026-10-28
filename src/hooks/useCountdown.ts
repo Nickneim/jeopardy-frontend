@@ -5,16 +5,18 @@ const TICK_MS = 100
 /**
  * Time left in the current phase, counting down from the server's
  * `phaseRemainingMs` since the snapshot arrived (`receivedAt`, from
- * performance.now()). Null when the phase has no timer.
+ * performance.now()). Null when the phase has no timer. While `paused`
+ * (Trebek stopped the clock) it stays where it stopped.
  */
 export function useCountdown(
   remainingMs: number | null,
   receivedAt: number,
+  paused = false,
 ): number | null {
   const [now, setNow] = useState(() => performance.now())
 
   useEffect(() => {
-    if (remainingMs === null) {
+    if (remainingMs === null || paused) {
       return
     }
 
@@ -24,10 +26,10 @@ export function useCountdown(
     )
 
     return () => window.clearInterval(timer)
-  }, [remainingMs, receivedAt])
+  }, [remainingMs, receivedAt, paused])
 
-  if (remainingMs === null) {
-    return null
+  if (remainingMs === null || paused) {
+    return remainingMs
   }
 
   // `now` can be older than a snapshot that just arrived.

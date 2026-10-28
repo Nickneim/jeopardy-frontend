@@ -10,6 +10,8 @@ interface StatusBarProps {
   durationMs: number | null
   // Time left in the phase (useCountdown), or null without a timer.
   leftMs: number | null
+  // Trebek stopped the clock.
+  paused?: boolean
 }
 
 // Between the main screen and the podiums: a link home, the round, whose
@@ -19,6 +21,7 @@ function StatusBar({
   status,
   durationMs,
   leftMs,
+  paused = false,
 }: StatusBarProps) {
   const hasTimer = leftMs !== null && Boolean(durationMs)
   const seconds = Math.ceil((leftMs ?? 0) / 1000)
@@ -44,9 +47,15 @@ function StatusBar({
         <span>{status.message}</span>
       </p>
 
+      {paused && <span className="tv-paused">Paused</span>}
+
       {hasTimer && (
         <div
-          className={leftMs! <= ENDING_MS ? 'tv-timer is-ending' : 'tv-timer'}
+          className={[
+            'tv-timer',
+            !paused && leftMs! <= ENDING_MS && 'is-ending',
+            paused && 'is-paused',
+          ].filter(Boolean).join(' ')}
           role="timer"
           aria-label={`${seconds} seconds left`}
         >

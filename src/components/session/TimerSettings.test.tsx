@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { DEFAULT_TIMERS } from '../../api/sessions'
+import { DEFAULT_TIMER_MODES, DEFAULT_TIMERS } from '../../api/sessions'
 import { makeSession } from '../../test/fixtures'
 import TimerSettings from './TimerSettings'
 
@@ -79,5 +79,27 @@ describe('TimerSettings reset', () => {
     )
 
     expect(onSave).toHaveBeenCalledWith({ buzzerMs: 10000 })
+  })
+
+  test("switches a Trebek game's timer between automatic and waiting for Trebek", async () => {
+    const onSaveModes = vi.fn()
+    render(
+      <TimerSettings
+        timers={timers}
+        modes={DEFAULT_TIMER_MODES}
+        canEdit
+        onSave={() => {}}
+        onSaveModes={onSaveModes}
+      />,
+    )
+
+    // The clue reveal waits for Trebek by default: no clock to set.
+    const reveal = screen.getByRole('group', { name: 'Clue reveal mode' })
+    expect(within(reveal).getByRole('button', { name: 'Trebek' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByLabelText('Clue reveal')).not.toBeInTheDocument()
+
+    await userEvent.click(within(reveal).getByRole('button', { name: 'Automatic' }))
+    expect(onSaveModes).toHaveBeenCalledWith({ clueRevealMs: 'AUTOMATIC' })
   })
 })

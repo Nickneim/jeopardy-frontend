@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { Player } from '../../api/sessions'
+import type { Player, Trebek } from '../../api/sessions'
 import Podium from './Podium'
 
 // Up to this many players share the row; with more, yours stays on the left
@@ -11,6 +11,8 @@ const FADE_PX = 64
 interface PodiumRowProps {
   players: Player[]
   me: Player | null
+  // A Trebek game's host, on their own lectern at the left.
+  trebek?: Trebek | null
   activeId: number | null
   lights: number
   lockedOut: number[]
@@ -32,6 +34,7 @@ interface PodiumRowProps {
 function PodiumRow({
   players,
   me,
+  trebek = null,
   activeId,
   lights,
   lockedOut,
@@ -109,6 +112,21 @@ function PodiumRow({
   return (
     <div className="podium-row">
       <div className="podium-area">
+        {trebek && (
+          <>
+            <div
+              role="group"
+              className={trebek.away ? 'trebek-lectern is-away' : 'trebek-lectern'}
+              aria-label={`Your host, ${trebek.name}${trebek.away ? ' (away)' : ''}`}
+            >
+              {trebek.away && <span className="podium-badge">Away</span>}
+              <span className="tv-kicker">Your host</span>
+              <span className="trebek-lectern-name tv-hand">{trebek.name}</span>
+            </div>
+            <div className="podium-divider" aria-hidden="true" />
+          </>
+        )}
+
         {pinned && (
           <>
             <div className="podium-pinned">{renderPodium(pinned)}</div>

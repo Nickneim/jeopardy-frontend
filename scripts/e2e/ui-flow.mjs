@@ -319,7 +319,74 @@ try {
   await carol.waitText('Watch as spectator')
   await carol.screenshot('choice.png')
 
-  for (const p of [alice, bob, carol, frank]) {
+  // Hosting as Trebek: the desk, the hidden clue, a ruling, and leaving.
+  const grace = await newPlayer('Grace')
+  const henry = await newPlayer('Henry')
+  await grace.goto(`${APP}/games/${GAME_ID}`)
+  await grace.waitText('Host live game')
+  await grace.host('Grace')
+  await grace.waitText('Be Trebek')
+  await grace.waitConnected()
+  await grace.eval(`document.querySelector('input[name=hostMode][value=TREBEK]').click()`)
+  check('the host can switch to Trebek, which waits for a player',
+    await grace.waitText('wait for at least one player'))
+  const url3 = await grace.eval('location.href')
+  await henry.goto(url3)
+  await henry.waitText('Your name')
+  await henry.join('Henry')
+  check('a player sees the host is Trebek', await henry.waitText('is hosting as Trebek'))
+  await grace.eval(`(() => {
+    const start = [...document.querySelectorAll('button')].find(b => b.textContent === 'Start game')
+    return new Promise(resolve => {
+      const tick = () => start.disabled ? setTimeout(tick, 100) : resolve(start.click())
+      tick()
+    })
+  })()`)
+  check('Trebek has no podium, but a lectern and a desk',
+    await grace.waitText('Host desk') && await grace.waitText('Your host') &&
+    !(await grace.eval(`!!document.querySelector('.podium.is-me')`)))
+
+  await henry.waitText('Your pick · choose a clue')
+  await henry.eval(`document.querySelector('button.tv-board-cell:not(:disabled)').click()`)
+  check('Trebek gets the picked clue first',
+    await grace.waitText('Show the clue to everyone'))
+  const question = await grace.eval(`document.querySelector('.trebek-clue-question')?.textContent ?? ''`)
+  check("the players don't see it yet",
+    question.length > 0 && await henry.waitText('is about to show the clue') &&
+    !(await henry.text()).includes(question), question)
+  await grace.screenshot('trebek-desk.png')
+
+  await grace.click('Show the clue to everyone')
+  check('showing the clue shows it to the players', await henry.waitText(question))
+  await grace.click('Open the buzzers')
+  await henry.waitText('Buzzers open')
+  await henry.eval(`document.querySelector('.buzz-button').click()`)
+  await henry.waitText('Your response')
+  // A controlled input: set it the way typing would.
+  await henry.eval(`(() => {
+    const input = document.querySelector('.tv-form input')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'What is a guess?')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    setTimeout(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Answer').click(), 100)
+  })()`)
+  check("Trebek sees the submitted answer, the player waits for the ruling",
+    await grace.waitText('What is a guess?') && await henry.waitText('is ruling on your answer'))
+  await grace.click('Correct +')
+  check('the ruling scores on the podium', await henry.waitText('$', 5000) &&
+    await henry.eval(`(async () => {
+      for (let k = 0; k < 50; k++) {
+        if (!document.querySelector('.podium.is-me .podium-score')?.textContent.startsWith('$0')) return true
+        await new Promise(r => setTimeout(r, 100))
+      }
+      return false
+    })()`))
+
+  await grace.click('Leave')
+  await grace.click('Yes, leave')
+  check('Trebek leaving mid-game ends it for the players',
+    await henry.waitText('Trebek left, so the game is over.'))
+
+  for (const p of [alice, bob, carol, frank, grace, henry]) {
     check(`no console errors for ${p.name}`, p.problems.length === 0, p.problems.join(' | '))
   }
   console.log(`\nScreenshots: ${OUT}`)

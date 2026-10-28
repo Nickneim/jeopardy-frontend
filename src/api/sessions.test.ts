@@ -9,11 +9,12 @@ import {
   getRememberedPlayerName,
   getStoredPlayer,
   isJoinable,
-  isLastPlayer,
+  leavingClosesSession,
   joinSessionAction,
   sessionLoader,
   sessionsAction,
   sessionsLoader,
+  type GameSession,
 } from './sessions'
 
 vi.mock('./client', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
@@ -459,15 +460,43 @@ describe('isJoinable', () => {
   })
 })
 
-describe('isLastPlayer', () => {
+describe('leavingClosesSession', () => {
   const players = [makePlayer({ id: 1 }), makePlayer({ id: 2, leaving: true })]
 
   test('is true when everyone else has left', () => {
-    expect(isLastPlayer(makeSession({ state: 'CHOOSING_CLUE', players }), 1)).toBe(true)
+    expect(leavingClosesSession(makeSession({ state: 'CHOOSING_CLUE', players }), 1)).toBe(true)
   })
 
   test('is never true once the game has finished, whose results stay', () => {
-    expect(isLastPlayer(makeSession({ state: 'FINISHED_GAME', players }), 1)).toBe(false)
+    expect(leavingClosesSession(makeSession({ state: 'FINISHED_GAME', players }), 1)).toBe(false)
+  })
+
+  describe('in a Trebek game', () => {
+    const trebek = { id: 9, name: 'Alex', away: false }
+    const one = [makePlayer({ id: 1 })]
+
+    function trebekSession(state: GameSession['state'], withPlayers = one) {
+      return makeSession({ state, hostMode: 'TREBEK', trebek, hostPlayerId: 9, players: withPlayers })
+    }
+
+    test('Trebek leaving during the game ends it', () => {
+      expect(leavingClosesSession(trebekSession('WAITING_FOR_RULING'), 9)).toBe(true)
+      expect(leavingClosesSession(trebekSession('FINAL_JEOPARDY_REVEALING'), 9)).toBe(true)
+    })
+
+    test('Trebek leaving the lobby passes the host on, unless nobody is there', () => {
+      expect(leavingClosesSession(trebekSession('WAITING_FOR_START'), 9)).toBe(false)
+      expect(leavingClosesSession(trebekSession('WAITING_FOR_START', []), 9)).toBe(true)
+    })
+
+    test('the last player leaves Trebek waiting in the lobby, but ends a game', () => {
+      expect(leavingClosesSession(trebekSession('WAITING_FOR_START'), 1)).toBe(false)
+      expect(leavingClosesSession(trebekSession('CHOOSING_CLUE'), 1)).toBe(true)
+    })
+
+    test('nobody leaving a finished game closes it', () => {
+      expect(leavingClosesSession(trebekSession('FINISHED_GAME'), 9)).toBe(false)
+    })
   })
 })
 

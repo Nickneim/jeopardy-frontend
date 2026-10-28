@@ -2,11 +2,13 @@ import { Client, TickerStrategy } from '@stomp/stompjs'
 import { useEffect, useRef, useState } from 'react'
 import {
   getSession,
-  isLastPlayer,
+  leavingClosesSession,
   type GameSession,
   type GameSessionError,
   type JoinedPlayer,
   type SessionTimers,
+  type TrebekView,
+  type UpdateSettingsRequest,
 } from '../api/sessions'
 import { hasErrorCode, isServerOffline } from '../api/errors'
 
@@ -54,10 +56,18 @@ export interface SessionActions {
   placeFinalJeopardyWager: (wager: number) => void
   answerFinalJeopardy: (answer: string) => void
   updateTimers: (timers: Partial<SessionTimers>) => void
-  updateSettings: (settings: { allowLateJoin: boolean }) => void
+  updateSettings: (settings: UpdateSettingsRequest) => void
   kick: (playerId: number) => void
   // False if it couldn't be sent (not connected).
   leave: () => boolean
+  // Trebek only (api.md §6.8).
+  advance: () => void
+  returnClue: () => void
+  rule: (correct: boolean) => void
+  ruleFinal: (playerId: number, correct: boolean) => void
+  adjustScore: (playerId: number, amount: number) => void
+  pause: () => void
+  resume: () => void
 }
 
 const ERROR_VISIBLE_MS = 5000
@@ -102,6 +112,15 @@ export function useGameSession(
   }))
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [error, setError] = useState<GameSessionError | null>(null)
+  // Trebek's private view: the newest that arrived, and the newest that goes
+  // with a snapshot we have (the two can arrive in either order).
+  const [latestView, setLatestView] = useState<TrebekView | null>(null)
+  const [trebekView, setTrebekView] = useState<TrebekView | null>(null)
+
+  if (latestView !== null && latestView !== trebekView &&
+    latestView.version === snapshot.session.version) {
+    setTrebekView(latestView)
+  }
 
   const clientRef = useRef<Client | null>(null)
   // Stops the current client for good, so it isn't checked on anymore.
@@ -205,6 +224,17 @@ export function useGameSession(
           client.subscribe('/user/queue/errors', frame => {
             showError(JSON.parse(frame.body) as GameSessionError)
           })
+
+          // Only Trebek's connection receives anything here: once now, then
+          // with every broadcast. The host can become Trebek in the lobby,
+          // so every player subscribes.
+          client.subscribe('/user/queue/trebek', frame => {
+            const view = JSON.parse(frame.body) as TrebekView
+            setLatestView(current =>
+              current === null || view.version >= current.version
+                ? view
+                : current)
+          })
         }
 
         getSession(sessionId)
@@ -300,7 +330,7 @@ export function useGameSession(
       return false
     }
 
-    end(isLastPlayer(latest.session, latest.player.playerId)
+    end(leavingClosesSession(latest.session, latest.player.playerId)
       ? { reason: 'abandoned' }
       : { reason: 'left' })
     return true
@@ -324,7 +354,16 @@ export function useGameSession(
     updateSettings: settings => send('update-settings', settings),
     kick: playerId => send('kick', { playerId }),
     leave,
+    advance: () => send('advance'),
+    returnClue: () => send('return-clue'),
+    rule: correct => send('rule', { correct }),
+    ruleFinal: (playerId, correct) =>
+      send('rule-final', { playerId, correct }),
+    adjustScore: (playerId, amount) =>
+      send('adjust-score', { playerId, amount }),
+    pause: () => send('pause'),
+    resume: () => send('resume'),
   }))
 
-  return { ...snapshot, status, error, actions }
+  return { ...snapshot, trebekView, status, error, actions }
 }

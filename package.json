@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "node scripts/e2e/session-flow.mjs && node scripts/e2e/ui-flow.mjs",
+    "e2e": "node scripts/e2e/session-flow.mjs && node scripts/e2e/trebek-flow.mjs && node scripts/e2e/ui-flow.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

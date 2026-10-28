@@ -138,7 +138,17 @@ function SessionsPage() {
                 <td className="cell-nowrap">
                   {session.gameDate ? formatAirDate(session.gameDate) : '—'}
                 </td>
-                <td className="cell-host">{session.hostName ?? '—'}</td>
+                <td className="cell-host">
+                  {session.hostName ?? '—'}
+                  {session.hostMode === 'TREBEK' && (
+                    <>
+                      {' '}
+                      <span className="custom-show-badge" title="The host runs the show as Trebek and doesn't play">
+                        Trebek
+                      </span>
+                    </>
+                  )}
+                </td>
                 <td>{session.playerCount}</td>
                 <td className="cell-status">{stageLabel(sessionStage(session))}</td>
                 <td className="cell-actions">

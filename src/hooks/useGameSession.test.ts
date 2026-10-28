@@ -359,4 +359,83 @@ describe('useGameSession', () => {
       }),
     ])
   })
+
+  test("keeps Trebek's private view that goes with the snapshot", () => {
+    const { result } = renderHook(() =>
+      useGameSession(makeSession({ version: 1 }), PLAYER, () => {}))
+
+    connect()
+    const view = (version: number) => ({
+      version,
+      clue: null,
+      pendingAnswer: null,
+      finalJeopardy: null,
+    })
+    const sendView = (version: number) => act(() => {
+      lastClient().subscriptions.get('/user/queue/trebek')?.({
+        body: JSON.stringify(view(version)),
+      })
+    })
+
+    // The view can arrive before its snapshot: it waits for it.
+    sendView(2)
+    expect(result.current.trebekView).toBeNull()
+
+    broadcast(makeSession({ version: 2 }))
+    expect(result.current.trebekView?.version).toBe(2)
+
+    // A newer snapshot keeps the last matching view until its own arrives.
+    broadcast(makeSession({ version: 3 }))
+    expect(result.current.trebekView?.version).toBe(2)
+    sendView(3)
+    expect(result.current.trebekView?.version).toBe(3)
+  })
+
+  test("a watcher doesn't subscribe to Trebek's view", () => {
+    renderHook(() => useGameSession(makeSession(), null, () => {}))
+    connect()
+
+    expect(lastClient().subscriptions.has('/user/queue/trebek')).toBe(false)
+  })
+
+  test("sends Trebek's actions", () => {
+    const { result } = renderHook(() =>
+      useGameSession(makeSession(), PLAYER, () => {}))
+
+    connect()
+    act(() => {
+      result.current.actions.advance()
+      result.current.actions.rule(true)
+      result.current.actions.ruleFinal(3, false)
+      result.current.actions.adjustScore(3, -400)
+      result.current.actions.updateSettings({ hostMode: 'TREBEK' })
+    })
+
+    expect(lastClient().published.map(frame => [frame.destination, frame.body]))
+      .toEqual([
+        [`/app/sessions/${SESSION_ID}/advance`, ''],
+        [`/app/sessions/${SESSION_ID}/rule`, JSON.stringify({ correct: true })],
+        [`/app/sessions/${SESSION_ID}/rule-final`, JSON.stringify({ playerId: 3, correct: false })],
+        [`/app/sessions/${SESSION_ID}/adjust-score`, JSON.stringify({ playerId: 3, amount: -400 })],
+        [`/app/sessions/${SESSION_ID}/update-settings`, JSON.stringify({ hostMode: 'TREBEK' })],
+      ])
+  })
+
+  test('Trebek leaving during the game ends it as abandoned, at once', () => {
+    const onEnded = vi.fn()
+    const session = makeSession({
+      state: 'CHOOSING_CLUE',
+      hostMode: 'TREBEK',
+      trebek: { id: 2, name: 'Alex', away: false },
+      hostPlayerId: 2,
+      players: [makePlayer({ id: 1 }), makePlayer({ id: 3 })],
+    })
+    const { result } = renderHook(() =>
+      useGameSession(session, PLAYER, onEnded))
+
+    connect()
+    act(() => { result.current.actions.leave() })
+
+    expect(onEnded).toHaveBeenCalledWith({ reason: 'abandoned' })
+  })
 })
