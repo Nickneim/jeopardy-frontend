@@ -264,7 +264,9 @@ describe('SessionPage', () => {
 
     expect(await screen.findByRole('heading', { level: 2 }))
       .toHaveTextContent('DailyDouble!')
-    expect(screen.getByText('Rivers')).toBeInTheDocument()
+    // In the heading, besides the board left behind the screen.
+    expect(screen.getByText('Rivers', { selector: '.tv-heading span' }))
+      .toBeInTheDocument()
     // Nothing to wager yet.
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   })

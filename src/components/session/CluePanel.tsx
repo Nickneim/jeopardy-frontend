@@ -58,7 +58,7 @@ function CluePanel({
           <span>{category?.name}</span>
         </p>
 
-        <TitleCard title="Daily Double!" />
+        <TitleCard title="Daily Double!" zoom={false} />
 
         <p className="tv-waiting">
           {me !== null && session.playerChoosingClue === me.id

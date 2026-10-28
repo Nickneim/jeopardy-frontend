@@ -92,6 +92,24 @@
   border: 0;
 }
 
+/* Holds the screen and, while a clue is in play, the board behind it that
+   the clue grew out of (useClueZoom). */
+.tv-screen-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.tv-screen-frame > .tv-screen {
+  flex-grow: 1;
+}
+
+.tv-screen-frame > .tv-screen-behind {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
 /* The board's black gaps are the stage itself. */
 .tv-screen.is-board {
   padding: 0;

@@ -41,8 +41,15 @@ function SessionBoard({
         const slot = category.slots[row]
         const key = `${row}-${column}`
 
+        // A played cell keeps its clue's id: a clue grows out of it.
         if (!slot || slot.status !== 'AVAILABLE' || slot.clueId === null) {
-          return <div key={key} className="tv-board-cell" />
+          return (
+            <div
+              key={key}
+              className="tv-board-cell"
+              data-clue-id={slot?.clueId ?? undefined}
+            />
+          )
         }
 
         const clueId = slot.clueId
@@ -53,6 +60,7 @@ function SessionBoard({
             key={key}
             type="button"
             className="tv-board-cell"
+            data-clue-id={clueId}
             aria-label={`${category.name} for $${slot.value ?? 0}`}
             disabled={!canChoose}
             onClick={() => onChoose(clueId)}

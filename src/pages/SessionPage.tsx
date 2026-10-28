@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Link,
   useLoaderData,
@@ -37,6 +37,7 @@ import StatusBar from '../components/session/StatusBar'
 import TitleCard from '../components/session/TitleCard'
 import TrebekDesk from '../components/session/TrebekDesk'
 import { ROUND_NAMES } from '../format'
+import { useClueZoom } from '../hooks/useClueZoom'
 import { useCountdown } from '../hooks/useCountdown'
 import { useGameSession, type SessionEnd } from '../hooks/useGameSession'
 import { linkedJoinMode, type JoinMode } from '../navigation'
@@ -106,6 +107,14 @@ function LiveSession({
     session.phaseRemainingMs,
     receivedAt,
     session.paused,
+  )
+  const screenRef = useRef<HTMLDivElement>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
+  useClueZoom(
+    screenRef,
+    boardRef,
+    CLUE_STATES.has(session.state) ? session.currentClue?.clueId ?? null : null,
+    session.state === 'REVEALING_DAILY_DOUBLE',
   )
 
   const isClosed = session.state === 'CLOSED'
@@ -219,83 +228,98 @@ function LiveSession({
         : <p className="tv-strip session-error" role="alert">{error.message}</p>)}
 
       <div className={hasDesk ? 'tv-main has-desk' : 'tv-main'}>
-        <div className={state === 'CHOOSING_CLUE' ? 'tv-screen is-board' : 'tv-screen'}>
-          {/* Game actions go over the live connection: until it's up, a click
-              would be lost, so every control on the screen waits for it. The
-              fieldset only disables: Chrome doesn't stretch a fieldset's
-              content, so the layout is on the div inside. */}
-          <fieldset className="tv-screen-controls" disabled={!isConnected}>
-            <div className="tv-screen-content">
-              {state === 'WAITING_FOR_START' && (
-                <Lobby
-                  code={session.id}
-                  isHost={isHost}
-                  hostName={hostName}
-                  hostMode={session.hostMode}
-                  playerCount={session.players.length}
-                  timers={session.timers}
-                  timerModes={session.timerModes}
-                  allowLateJoin={session.allowLateJoin}
-                  onStart={actions.start}
-                  onUpdateTimers={actions.updateTimers}
-                  onUpdateSettings={actions.updateSettings}
-                />
-              )}
-
-              {/* Only the round's name: nothing can be played yet. */}
-              {state === 'ROUND_INTRO' && (
-                <TitleCard key={session.round} title={ROUND_NAMES[session.round]} />
-              )}
-
-              {state === 'CHOOSING_CLUE' && (
-                <SessionBoard
-                  board={session.board}
-                  // Trebek can pick for the chooser, a clue they named out loud.
-                  canChoose={isMyChoice || amTrebek}
-                  onChoose={actions.chooseClue}
-                />
-              )}
-
-              {CLUE_STATES.has(state) && (
-                <CluePanel session={session} me={me} actions={actions} />
-              )}
-
-              {FINAL_JEOPARDY_STATES.has(state) && (
-                <FinalJeopardyPanel
-                  session={session}
-                  me={me}
-                  actions={actions}
-                  reveal={reveal}
-                />
-              )}
-
-              {state === 'FINISHED_GAME' && (
-                <>
-                  <GameResult
-                    players={session.players}
-                    final={session.finalJeopardy}
-                    myPlayerId={me?.id}
-                  />
-
-                  <div className="tv-links">
-                    <Link to="/sessions">Back to live games</Link>
-                    <Link to="/games">Play another game</Link>
-                  </div>
-                </>
-              )}
-            </div>
-          </fieldset>
-
-          {!me && !amTrebek && canJoin && joinMode !== 'watch' && (
-            <div className="tv-overlay">
-              <JoinChoice
-                canJoin={canJoin}
-                joinScore={session.joinScore}
-                mode={joinMode}
-                onModeChange={setJoinMode}
-              />
+        <div className="tv-screen-frame">
+          {/* While a clue is in play, the board stays behind the screen that
+              grew out of it (useClueZoom). */}
+          {CLUE_STATES.has(state) && (
+            <div className="tv-screen is-board tv-screen-behind" aria-hidden="true" inert>
+              <div ref={boardRef} className="tv-screen-content">
+                <SessionBoard board={session.board} canChoose={false} onChoose={() => {}} />
+              </div>
             </div>
           )}
+
+          <div
+            ref={screenRef}
+            className={state === 'CHOOSING_CLUE' ? 'tv-screen is-board' : 'tv-screen'}
+          >
+            {/* Game actions go over the live connection: until it's up, a click
+                would be lost, so every control on the screen waits for it. The
+                fieldset only disables: Chrome doesn't stretch a fieldset's
+                content, so the layout is on the div inside. */}
+            <fieldset className="tv-screen-controls" disabled={!isConnected}>
+              <div className="tv-screen-content">
+                {state === 'WAITING_FOR_START' && (
+                  <Lobby
+                    code={session.id}
+                    isHost={isHost}
+                    hostName={hostName}
+                    hostMode={session.hostMode}
+                    playerCount={session.players.length}
+                    timers={session.timers}
+                    timerModes={session.timerModes}
+                    allowLateJoin={session.allowLateJoin}
+                    onStart={actions.start}
+                    onUpdateTimers={actions.updateTimers}
+                    onUpdateSettings={actions.updateSettings}
+                  />
+                )}
+
+                {/* Only the round's name: nothing can be played yet. */}
+                {state === 'ROUND_INTRO' && (
+                  <TitleCard key={session.round} title={ROUND_NAMES[session.round]} />
+                )}
+
+                {state === 'CHOOSING_CLUE' && (
+                  <SessionBoard
+                    board={session.board}
+                    // Trebek can pick for the chooser, a clue they named out loud.
+                    canChoose={isMyChoice || amTrebek}
+                    onChoose={actions.chooseClue}
+                  />
+                )}
+
+                {CLUE_STATES.has(state) && (
+                  <CluePanel session={session} me={me} actions={actions} />
+                )}
+
+                {FINAL_JEOPARDY_STATES.has(state) && (
+                  <FinalJeopardyPanel
+                    session={session}
+                    me={me}
+                    actions={actions}
+                    reveal={reveal}
+                  />
+                )}
+
+                {state === 'FINISHED_GAME' && (
+                  <>
+                    <GameResult
+                      players={session.players}
+                      final={session.finalJeopardy}
+                      myPlayerId={me?.id}
+                    />
+
+                    <div className="tv-links">
+                      <Link to="/sessions">Back to live games</Link>
+                      <Link to="/games">Play another game</Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            </fieldset>
+
+            {!me && !amTrebek && canJoin && joinMode !== 'watch' && (
+              <div className="tv-overlay">
+                <JoinChoice
+                  canJoin={canJoin}
+                  joinScore={session.joinScore}
+                  mode={joinMode}
+                  onModeChange={setJoinMode}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {hasDesk && (
