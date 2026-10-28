@@ -1406,6 +1406,42 @@
   border: 0;
 }
 
+/* The lobby's clue types: media clues the host can leave out */
+
+.clue-types {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.clue-types legend {
+  width: 100%;
+  margin-bottom: 4px;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.clue-types .is-locked {
+  cursor: default;
+}
+
+.clue-types-note {
+  font-size: 16px;
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.clue-types .lobby-note {
+  flex-basis: 100%;
+  text-align: center;
+}
+
 /* Hosting as Trebek: the lobby's choice and timer modes */
 
 .host-modes {

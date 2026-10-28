@@ -41,6 +41,7 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
     hostMode: 'CONTESTANT',
     trebek: null,
     allowLateJoin: true,
+    clueTypes: [],
     joinScore: 0,
     players: [],
     hostPlayerId: null,

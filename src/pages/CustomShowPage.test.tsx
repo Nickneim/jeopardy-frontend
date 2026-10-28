@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, test, vi } from 'vitest'
@@ -120,8 +120,9 @@ describe('CustomShowPage', () => {
     expect(await screen.findByText('Loaded Show #8612 - Friday, March 4, 2022')).toBeInTheDocument()
     expect(screen.getByLabelText('Show name')).toHaveValue('Show #8612 - Friday, March 4, 2022')
     expect(screen.getByDisplayValue('Islands')).toBeInTheDocument()
-    // A reload doesn't load it again.
-    expect(router.state.location.search).toBe('')
+    // A reload doesn't load it again. Dropping the parameter is a navigation,
+    // which ends asynchronously.
+    await waitFor(() => expect(router.state.location.search).toBe(''))
   })
 
   test('a game from the catalog asks before replacing a board', async () => {

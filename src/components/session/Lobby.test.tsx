@@ -19,6 +19,7 @@ function renderLobby(hostMode: HostMode, playerCount: number, isHost = true) {
       timers={makeSession().timers}
       timerModes={DEFAULT_TIMER_MODES}
       allowLateJoin
+      clueTypes={[]}
       onStart={onStart}
       onUpdateTimers={() => {}}
       onUpdateSettings={onUpdateSettings}

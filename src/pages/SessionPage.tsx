@@ -286,6 +286,7 @@ function LiveSession({
                     timers={session.timers}
                     timerModes={session.timerModes}
                     allowLateJoin={session.allowLateJoin}
+                    clueTypes={session.clueTypes}
                     onStart={actions.start}
                     onUpdateTimers={actions.updateTimers}
                     onUpdateSettings={actions.updateSettings}

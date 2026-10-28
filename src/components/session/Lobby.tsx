@@ -1,9 +1,11 @@
 import type {
+  ClueTypeSetting,
   HostMode,
   SessionTimerModes,
   SessionTimers,
   UpdateSettingsRequest,
 } from '../../api/sessions'
+import ClueTypeSettings from './ClueTypeSettings'
 import TimerSettings from './TimerSettings'
 
 const HOST_MODES: { mode: HostMode, kicker: string, title: string, about: string }[] = [
@@ -32,6 +34,7 @@ interface LobbyProps {
   timers: SessionTimers
   timerModes: SessionTimerModes
   allowLateJoin: boolean
+  clueTypes: ClueTypeSetting[]
   onStart: () => void
   onUpdateTimers: (timers: Partial<SessionTimers>) => void
   onUpdateSettings: (settings: UpdateSettingsRequest) => void
@@ -46,6 +49,7 @@ function Lobby({
   timers,
   timerModes,
   allowLateJoin,
+  clueTypes,
   onStart,
   onUpdateTimers,
   onUpdateSettings,
@@ -139,6 +143,12 @@ function Lobby({
               : 'Nobody can join after the game starts.'}
           </p>
         )}
+
+      <ClueTypeSettings
+        clueTypes={clueTypes}
+        canEdit={isHost}
+        onSave={disabledClueTypes => onUpdateSettings({ disabledClueTypes })}
+      />
 
       <TimerSettings
         timers={timers}

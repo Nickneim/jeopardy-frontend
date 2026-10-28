@@ -73,6 +73,15 @@ export interface Trebek {
   away: boolean
 }
 
+// One of the game's clue types in the lobby (api.md §6.9).
+export interface ClueTypeSetting {
+  type: ClueType
+  // Clues of this type the game has, disabled or not.
+  clueCount: number
+  // False: left out of the game. TEXT is always enabled.
+  enabled: boolean
+}
+
 export interface Player {
   id: number
   name: string
@@ -277,6 +286,9 @@ export interface GameSession {
   // Whether players can join after the start. Only the host changes it,
   // before the start.
   allowLateJoin: boolean
+  // In the lobby, the game's clue types for the host to leave some out
+  // (api.md §6.9). [] once the game has started.
+  clueTypes: ClueTypeSetting[]
   // The score a player who joins now starts with, never above 0.
   joinScore: number
   // Never Trebek.
@@ -339,6 +351,8 @@ export interface UpdateSettingsRequest {
   allowLateJoin?: boolean
   hostMode?: HostMode
   timerModes?: Partial<SessionTimerModes>
+  // Replaces the disabled list, [] enables every type. Never TEXT.
+  disabledClueTypes?: ClueType[]
 }
 
 // ---------- Trebek's private view (/user/queue/trebek, api.md §6.8) ----------
@@ -430,7 +444,8 @@ export interface GameSessionSummary {
   gameTitle: string | null
   // A board built in the custom show editor rather than a stored game.
   custom: boolean
-  // Clues on the board, all rounds and Final Jeopardy.
+  // Clues on the board, all rounds and Final Jeopardy, leaving out the clue
+  // types the host disabled.
   clueCount: number
   // The game's season and air date ("YYYY-MM-DD"), null without a game.
   gameSeason: string | null
