@@ -83,6 +83,15 @@ function TrebekDesk({ session, view, actions }: TrebekDeskProps) {
 
   function controls() {
     switch (state) {
+      case 'ROUND_INTRO':
+        return (
+          <div className="trebek-buttons">
+            {step(session.round === 'FINAL_JEOPARDY'
+              ? 'On to the wagers'
+              : 'Begin the round')}
+          </div>
+        )
+
       case 'CHOOSING_CLUE':
         return (
           <p className="trebek-note">
@@ -100,7 +109,7 @@ function TrebekDesk({ session, view, actions }: TrebekDeskProps) {
             </p>
             <div className="trebek-buttons">
               {step(clue?.dailyDouble
-                ? 'Reveal the Daily Double'
+                ? 'Announce the Daily Double'
                 : 'Show the clue to everyone')}
               <button
                 type="button"
@@ -111,6 +120,13 @@ function TrebekDesk({ session, view, actions }: TrebekDeskProps) {
               </button>
             </div>
           </>
+        )
+
+      case 'REVEALING_DAILY_DOUBLE':
+        return (
+          <div className="trebek-buttons">
+            {step(`Ask ${chooser} for a wager`)}
+          </div>
         )
 
       case 'WAITING_FOR_DAILY_DOUBLE_WAGER': {

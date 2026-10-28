@@ -16,9 +16,13 @@ export type GameRound = 'JEOPARDY' | 'DOUBLE_JEOPARDY' | 'FINAL_JEOPARDY'
 
 export type GameSessionState =
   | 'WAITING_FOR_START'
+  // The title card of `round`, before each round.
+  | 'ROUND_INTRO'
   | 'CHOOSING_CLUE'
   // Trebek sessions: a clue was chosen and Trebek hasn't shown it.
   | 'CLUE_PICKED'
+  // A Daily Double is announced, before the wager.
+  | 'REVEALING_DAILY_DOUBLE'
   | 'WAITING_FOR_DAILY_DOUBLE_WAGER'
   | 'REVEALING_CLUE'
   | 'WAITING_FOR_BUZZER'
@@ -107,7 +111,12 @@ export interface SessionTimers {
   answerRevealMs: number
   finalJeopardyWagerMs: number
   finalJeopardyAnswerMs: number
+  // Per player, split evenly over their reveal's steps.
   finalJeopardyRevealMs: number
+  // Each round's title card.
+  roundIntroMs: number
+  // A Daily Double's announcement, before the wager.
+  dailyDoubleRevealMs: number
 }
 
 // Which phases wait for Trebek, keyed like SessionTimers.
@@ -124,6 +133,8 @@ export const DEFAULT_TIMER_MODES: SessionTimerModes = {
   finalJeopardyWagerMs: 'AUTOMATIC',
   finalJeopardyAnswerMs: 'AUTOMATIC',
   finalJeopardyRevealMs: 'TREBEK',
+  roundIntroMs: 'AUTOMATIC',
+  dailyDoubleRevealMs: 'AUTOMATIC',
 }
 
 export const MIN_TIMER_MS = 1000
@@ -132,14 +143,16 @@ export const MAX_TIMER_MS = 300000
 // Every session starts with these (api.md §6.3).
 export const DEFAULT_TIMERS: SessionTimers = {
   clueChoiceMs: 30000,
-  clueRevealMs: 3000,
+  clueRevealMs: 8000,
   dailyDoubleWagerMs: 30000,
   buzzerMs: 10000,
   answerMs: 15000,
-  answerRevealMs: 3000,
+  answerRevealMs: 8000,
   finalJeopardyWagerMs: 30000,
   finalJeopardyAnswerMs: 30000,
   finalJeopardyRevealMs: 10000,
+  roundIntroMs: 6000,
+  dailyDoubleRevealMs: 6000,
 }
 
 export type ClueSlotStatus = 'AVAILABLE' | 'PLAYED' | 'EMPTY'
@@ -161,9 +174,11 @@ export interface CurrentClue {
   clueId: number
   value: number
   // Null in CLUE_PICKED, so the board doesn't give a Daily Double away.
+  // True from its announcement (REVEALING_DAILY_DOUBLE) on.
   dailyDouble: boolean | null
   wager: number | null
-  // The chooser's allowed wager, only while wagering on a Daily Double.
+  // The chooser's allowed wager, only while wagering on a Daily Double
+  // (not during its announcement).
   minWager: number | null
   maxWager: number | null
   question: string | null
@@ -199,9 +214,9 @@ export interface ClueAnswer {
   ruledByTrebek: boolean
 }
 
-// How far a player's Final Jeopardy reveal has got in a Trebek session:
-// their wager is shown from WAGER, their answer from ANSWER, and once
-// AWARDED their result, already applied to their score.
+// How far a player's Final Jeopardy reveal has got: their wager is shown
+// from WAGER, their answer from ANSWER, and once AWARDED their result,
+// already applied to their score.
 export type FinalRevealStep = 'HIDDEN' | 'WAGER' | 'ANSWER' | 'AWARDED'
 
 export interface FinalJeopardyPlayer {
@@ -211,15 +226,18 @@ export interface FinalJeopardyPlayer {
   hasAnswered: boolean
   // The most they can wager, only in FINAL_JEOPARDY_WAGERING.
   maxWager: number | null
+  // Revealed from revealStep WAGER.
   wager: number | null
+  // Revealed from ANSWER, with phrasedAsQuestion.
   answer: string | null
+  // Revealed at AWARDED.
   correct: boolean | null
-  // Revealed with `correct`, null without an answer.
+  // Null without an answer.
   phrasedAsQuestion: boolean | null
-  // Revealed, correct answers only (as in ClueAnswer).
+  // Revealed at AWARDED, correct answers only (as in ClueAnswer).
   matchedAnswers: string[] | null
   alsoAccepted: string[] | null
-  // Trebek sessions, from FINAL_JEOPARDY_REVEALING on.
+  // From FINAL_JEOPARDY_REVEALING on.
   revealStep: FinalRevealStep | null
 }
 
@@ -234,8 +252,8 @@ export interface FinalJeopardy {
   // Revealed with `answer`, ready to show (formatAcceptedAnswers).
   acceptedAnswers: AcceptedAnswers | null
   players: FinalJeopardyPlayer[]
-  // Trebek sessions, from FINAL_JEOPARDY_REVEALING on: the player ids in the
-  // order they're revealed.
+  // From FINAL_JEOPARDY_REVEALING on: the player ids in the order they're
+  // revealed, lowest score first.
   revealOrder: number[] | null
 }
 

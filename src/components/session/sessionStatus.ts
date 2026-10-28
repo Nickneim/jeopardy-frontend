@@ -40,6 +40,14 @@ export function sessionStatus(
         ? { who: null, message: 'Start the game when everyone is here' }
         : { who: name(session.hostPlayerId), message: 'will start the game' }
 
+    case 'ROUND_INTRO':
+      if (session.round === 'FINAL_JEOPARDY' || chooser === null) {
+        return { who: null, message: 'Get ready' }
+      }
+      return isMe(chooser)
+        ? { who: null, message: 'Get ready · you pick first' }
+        : { who: name(chooser), message: 'picks first' }
+
     case 'CHOOSING_CLUE':
       return isMe(chooser)
         ? { who: null, message: 'Your pick · choose a clue' }
@@ -49,6 +57,11 @@ export function sessionStatus(
       return isTrebek
         ? { who: name(chooser), message: "picked a clue · show it when you're ready" }
         : { who: name(session.hostPlayerId), message: 'is about to show the clue' }
+
+    case 'REVEALING_DAILY_DOUBLE':
+      return isMe(chooser)
+        ? { who: null, message: 'Daily Double · get ready to wager' }
+        : { who: name(chooser), message: 'found a Daily Double' }
 
     case 'WAITING_FOR_DAILY_DOUBLE_WAGER':
       return isMe(chooser)

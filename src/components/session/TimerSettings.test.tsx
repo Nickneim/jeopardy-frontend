@@ -68,7 +68,7 @@ describe('TimerSettings reset', () => {
     )
 
     const resets = screen.getAllByRole('button', { name: /^Reset / })
-    expect(resets).toHaveLength(9)
+    expect(resets).toHaveLength(11)
     expect(resets.filter(button => !(button as HTMLButtonElement).disabled))
       .toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Reset Answer to the default, 15s' }))

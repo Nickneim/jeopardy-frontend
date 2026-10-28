@@ -1,109 +1,83 @@
 import { describe, expect, test } from 'vitest'
-import type { FinalJeopardyPlayer } from '../../api/sessions'
+import type { FinalJeopardyPlayer, FinalRevealStep } from '../../api/sessions'
 import { makePlayer, makeSession } from '../../test/fixtures'
 import { finalRevealProgress } from './revealProgress'
 
 function result(
   playerId: number,
-  wager: number,
-  correct: boolean,
+  revealStep: FinalRevealStep,
 ): FinalJeopardyPlayer {
   return {
     playerId,
     hasWagered: true,
     hasAnswered: true,
     maxWager: null,
-    wager,
-    answer: correct ? 'What is Budapest?' : 'What is Vienna?',
-    correct,
-    phrasedAsQuestion: true,
-    matchedAnswers: correct ? ['Budapest'] : null,
-    alsoAccepted: correct ? [] : null,
-    revealStep: null,
+    wager: revealStep === 'HIDDEN' ? null : 500,
+    answer: revealStep === 'HIDDEN' || revealStep === 'WAGER'
+      ? null
+      : 'What is Budapest?',
+    correct: revealStep === 'AWARDED' ? true : null,
+    phrasedAsQuestion: null,
+    matchedAnswers: null,
+    alsoAccepted: null,
+    revealStep,
   }
 }
 
-// Scores before Final Jeopardy: Ben lowest, then Carla, then Ana.
-const session = makeSession({
-  state: 'FINAL_JEOPARDY_REVEALING',
-  round: 'FINAL_JEOPARDY',
-  phaseDurationMs: 9000,
-  phaseRemainingMs: 9000,
-  players: [
-    makePlayer({ id: 1, name: 'Ana', score: 2400 }),
-    makePlayer({ id: 2, name: 'Ben', score: 100 }),
-    makePlayer({ id: 3, name: 'Carla', score: 1200 }),
-  ],
-  finalJeopardy: {
-    category: 'FAMOUS BRIDGES',
-    categoryComments: null,
-    question: 'Its Chain Bridge opened in 1849',
-    numberExpected: false,
-    answer: 'Budapest',
-    acceptedAnswers: { required: 1, options: ['Budapest'] },
-    players: [result(1, 500, false), result(2, 100, false), result(3, 1000, true)],
-    revealOrder: null,
-  },
-})
+// Revealed lowest score first: Ben, then Carla, then Ana.
+function revealing(steps: Record<number, FinalRevealStep>) {
+  return makeSession({
+    state: 'FINAL_JEOPARDY_REVEALING',
+    round: 'FINAL_JEOPARDY',
+    phaseDurationMs: 3333,
+    phaseRemainingMs: 3333,
+    players: [
+      makePlayer({ id: 1, name: 'Ana', score: 2400 }),
+      makePlayer({ id: 2, name: 'Ben', score: 100 }),
+      makePlayer({ id: 3, name: 'Carla', score: 1200 }),
+    ],
+    finalJeopardy: {
+      category: 'FAMOUS BRIDGES',
+      categoryComments: null,
+      question: 'Its Chain Bridge opened in 1849',
+      numberExpected: false,
+      answer: 'Budapest',
+      acceptedAnswers: { required: 1, options: ['Budapest'] },
+      players: [1, 2, 3].map(id => result(id, steps[id])),
+      revealOrder: [2, 3, 1],
+    },
+  })
+}
 
 describe('finalRevealProgress', () => {
-  test('reveals from the lowest score to the highest', () => {
-    const progress = finalRevealProgress(session, 9000)
+  test('starts with everyone hidden, in the reveal order', () => {
+    const progress = finalRevealProgress(
+      revealing({ 1: 'HIDDEN', 2: 'HIDDEN', 3: 'HIDDEN' }))
 
     expect(progress?.order.map(r => r.playerId)).toEqual([2, 3, 1])
-    expect(progress).toMatchObject({ index: 0, step: 'wager', showCorrectResponse: false })
-    expect(progress?.scores.size).toBe(0)
+    expect(progress).toMatchObject({ index: 0, step: 'hidden', showCorrectResponse: false })
   })
 
-  test('splits the phase evenly: wager, response, then result', () => {
-    // Each player has 3 s, so a second for each step.
-    expect(finalRevealProgress(session, 7500)).toMatchObject({ index: 0, step: 'response' })
-    expect(finalRevealProgress(session, 6500)).toMatchObject({ index: 0, step: 'result' })
-    expect(finalRevealProgress(session, 5500)).toMatchObject({ index: 1, step: 'wager' })
-  })
-
-  test('applies the scores of the players revealed so far', () => {
-    const progress = finalRevealProgress(session, 3500)
-
-    expect(progress).toMatchObject({ index: 1, step: 'result' })
-    expect(progress?.scores).toEqual(new Map([[2, 0], [3, 2200]]))
+  test("follows each player's reveal step", () => {
+    expect(finalRevealProgress(revealing({ 1: 'HIDDEN', 2: 'WAGER', 3: 'HIDDEN' })))
+      .toMatchObject({ index: 0, step: 'wager' })
+    expect(finalRevealProgress(revealing({ 1: 'HIDDEN', 2: 'AWARDED', 3: 'HIDDEN' })))
+      .toMatchObject({ index: 0, step: 'result' })
+    expect(finalRevealProgress(revealing({ 1: 'HIDDEN', 2: 'AWARDED', 3: 'ANSWER' })))
+      .toMatchObject({ index: 1, step: 'response' })
   })
 
   test('shows the correct response with the last result', () => {
-    expect(finalRevealProgress(session, 1500)?.showCorrectResponse).toBe(false)
-
-    const end = finalRevealProgress(session, 0)
-    expect(end).toMatchObject({ index: 2, step: 'result', showCorrectResponse: true })
-    expect(end?.scores.get(1)).toBe(1900)
+    expect(finalRevealProgress(revealing({ 1: 'ANSWER', 2: 'AWARDED', 3: 'AWARDED' }))
+      ?.showCorrectResponse).toBe(false)
+    expect(finalRevealProgress(revealing({ 1: 'AWARDED', 2: 'AWARDED', 3: 'AWARDED' })))
+      .toMatchObject({ index: 2, step: 'result', showCorrectResponse: true })
   })
 
   test('is null outside the reveal', () => {
-    expect(finalRevealProgress({ ...session, state: 'FINAL_JEOPARDY_ANSWERING' }, 5000))
+    const session = revealing({ 1: 'HIDDEN', 2: 'HIDDEN', 3: 'HIDDEN' })
+
+    expect(finalRevealProgress({ ...session, state: 'FINAL_JEOPARDY_ANSWERING' }))
       .toBeNull()
-  })
-
-  test("follows each player's reveal step in a Trebek game", () => {
-    const final = session.finalJeopardy!
-    const trebekSession = (steps: Record<number, FinalJeopardyPlayer['revealStep']>) => ({
-      ...session,
-      // A clock waiting for Trebek has no duration.
-      phaseDurationMs: null,
-      phaseRemainingMs: null,
-      finalJeopardy: {
-        ...final,
-        revealOrder: [2, 3, 1],
-        players: final.players.map(p => ({ ...p, revealStep: steps[p.playerId] })),
-      },
-    })
-
-    expect(finalRevealProgress(trebekSession({ 1: 'HIDDEN', 2: 'HIDDEN', 3: 'HIDDEN' }), null))
-      .toMatchObject({ index: 0, step: 'hidden', showCorrectResponse: false })
-    expect(finalRevealProgress(trebekSession({ 1: 'HIDDEN', 2: 'AWARDED', 3: 'ANSWER' }), null))
-      .toMatchObject({ index: 1, step: 'response' })
-
-    const done = finalRevealProgress(trebekSession({ 1: 'AWARDED', 2: 'AWARDED', 3: 'AWARDED' }), null)
-    expect(done).toMatchObject({ index: 2, step: 'result', showCorrectResponse: true })
-    // The server applies each award itself.
-    expect(done?.scores.size).toBe(0)
   })
 })

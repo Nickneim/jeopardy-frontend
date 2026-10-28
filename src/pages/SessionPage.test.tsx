@@ -216,6 +216,59 @@ describe('SessionPage', () => {
     expect(screen.getByRole('button', { name: 'Share link' })).toBeEnabled()
   })
 
+  test("shows only the round's title card before the round", async () => {
+    renderSessionPage({
+      ...session,
+      state: 'ROUND_INTRO',
+      round: 'DOUBLE_JEOPARDY',
+      playerChoosingClue: 1,
+      phaseDurationMs: 6000,
+      phaseRemainingMs: 6000,
+      board: [{
+        name: 'Rivers',
+        comments: null,
+        slots: [{ row: 1, clueId: 5, value: 400, status: 'AVAILABLE' }],
+      }],
+    })
+
+    const title = await screen.findByRole('heading', { level: 2 })
+    expect(title).toHaveTextContent('DoubleJeopardy!')
+    expect(screen.queryByText('Rivers')).not.toBeInTheDocument()
+  })
+
+  test('announces a Daily Double before the wager', async () => {
+    renderSessionPage({
+      ...session,
+      state: 'REVEALING_DAILY_DOUBLE',
+      playerChoosingClue: 1,
+      board: [{
+        name: 'Rivers',
+        comments: null,
+        slots: [{ row: 1, clueId: 5, value: 400, status: 'AVAILABLE' }],
+      }],
+      currentClue: {
+        clueId: 5,
+        value: 400,
+        dailyDouble: true,
+        wager: null,
+        minWager: null,
+        maxWager: null,
+        question: null,
+        clueType: null,
+        mediaUrl: null,
+        numberExpected: null,
+        answer: null,
+        acceptedAnswers: null,
+      },
+    })
+
+    expect(await screen.findByRole('heading', { level: 2 }))
+      .toHaveTextContent('DailyDouble!')
+    expect(screen.getByText('Rivers')).toBeInTheDocument()
+    // Nothing to wager yet.
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+  })
+
   test('shows the offline message when the server is unreachable', async () => {
     hook.status = 'offline'
     renderSessionPage()

@@ -34,6 +34,7 @@ import SessionBoard from '../components/session/SessionBoard'
 import { sessionStatus } from '../components/session/sessionStatus'
 import ShareLinkButton from '../components/session/ShareLinkButton'
 import StatusBar from '../components/session/StatusBar'
+import TitleCard from '../components/session/TitleCard'
 import TrebekDesk from '../components/session/TrebekDesk'
 import { ROUND_NAMES } from '../format'
 import { useCountdown } from '../hooks/useCountdown'
@@ -42,6 +43,7 @@ import { linkedJoinMode, type JoinMode } from '../navigation'
 
 const CLUE_STATES = new Set<GameSessionState>([
   'CLUE_PICKED',
+  'REVEALING_DAILY_DOUBLE',
   'WAITING_FOR_DAILY_DOUBLE_WAGER',
   'REVEALING_CLUE',
   'WAITING_FOR_BUZZER',
@@ -61,8 +63,6 @@ const LIT_STATES = new Set<GameSessionState>([
   'WAITING_FOR_DAILY_DOUBLE_WAGER',
   'WAITING_FOR_ANSWER',
 ])
-
-const NO_SCORES = new Map<number, number>()
 
 const CLOSE_MESSAGES: Record<SessionCloseReason, string> = {
   ABANDONED: 'Everyone left, so this game has ended.',
@@ -165,7 +165,7 @@ function LiveSession({
 
   const state = session.state
   const isConnected = status === 'connected'
-  const reveal = finalRevealProgress(session, leftMs)
+  const reveal = finalRevealProgress(session)
   // From the Final Jeopardy reveal on the game is decided: players who
   // leave stay in the results, so Leave goes away. Joining closes earlier,
   // once Final Jeopardy's wagering is over.
@@ -221,60 +221,69 @@ function LiveSession({
       <div className={hasDesk ? 'tv-main has-desk' : 'tv-main'}>
         <div className={state === 'CHOOSING_CLUE' ? 'tv-screen is-board' : 'tv-screen'}>
           {/* Game actions go over the live connection: until it's up, a click
-              would be lost, so every control on the screen waits for it. */}
-          <fieldset className="tv-screen-content" disabled={!isConnected}>
-            {state === 'WAITING_FOR_START' && (
-              <Lobby
-                code={session.id}
-                isHost={isHost}
-                hostName={hostName}
-                hostMode={session.hostMode}
-                playerCount={session.players.length}
-                timers={session.timers}
-                timerModes={session.timerModes}
-                allowLateJoin={session.allowLateJoin}
-                onStart={actions.start}
-                onUpdateTimers={actions.updateTimers}
-                onUpdateSettings={actions.updateSettings}
-              />
-            )}
-
-            {state === 'CHOOSING_CLUE' && (
-              <SessionBoard
-                board={session.board}
-                // Trebek can pick for the chooser, a clue they named out loud.
-                canChoose={isMyChoice || amTrebek}
-                onChoose={actions.chooseClue}
-              />
-            )}
-
-            {CLUE_STATES.has(state) && (
-              <CluePanel session={session} me={me} actions={actions} />
-            )}
-
-            {FINAL_JEOPARDY_STATES.has(state) && (
-              <FinalJeopardyPanel
-                session={session}
-                me={me}
-                actions={actions}
-                reveal={reveal}
-              />
-            )}
-
-            {state === 'FINISHED_GAME' && (
-              <>
-                <GameResult
-                  players={session.players}
-                  final={session.finalJeopardy}
-                  myPlayerId={me?.id}
+              would be lost, so every control on the screen waits for it. The
+              fieldset only disables: Chrome doesn't stretch a fieldset's
+              content, so the layout is on the div inside. */}
+          <fieldset className="tv-screen-controls" disabled={!isConnected}>
+            <div className="tv-screen-content">
+              {state === 'WAITING_FOR_START' && (
+                <Lobby
+                  code={session.id}
+                  isHost={isHost}
+                  hostName={hostName}
+                  hostMode={session.hostMode}
+                  playerCount={session.players.length}
+                  timers={session.timers}
+                  timerModes={session.timerModes}
+                  allowLateJoin={session.allowLateJoin}
+                  onStart={actions.start}
+                  onUpdateTimers={actions.updateTimers}
+                  onUpdateSettings={actions.updateSettings}
                 />
+              )}
 
-                <div className="tv-links">
-                  <Link to="/sessions">Back to live games</Link>
-                  <Link to="/games">Play another game</Link>
-                </div>
-              </>
-            )}
+              {/* Only the round's name: nothing can be played yet. */}
+              {state === 'ROUND_INTRO' && (
+                <TitleCard key={session.round} title={ROUND_NAMES[session.round]} />
+              )}
+
+              {state === 'CHOOSING_CLUE' && (
+                <SessionBoard
+                  board={session.board}
+                  // Trebek can pick for the chooser, a clue they named out loud.
+                  canChoose={isMyChoice || amTrebek}
+                  onChoose={actions.chooseClue}
+                />
+              )}
+
+              {CLUE_STATES.has(state) && (
+                <CluePanel session={session} me={me} actions={actions} />
+              )}
+
+              {FINAL_JEOPARDY_STATES.has(state) && (
+                <FinalJeopardyPanel
+                  session={session}
+                  me={me}
+                  actions={actions}
+                  reveal={reveal}
+                />
+              )}
+
+              {state === 'FINISHED_GAME' && (
+                <>
+                  <GameResult
+                    players={session.players}
+                    final={session.finalJeopardy}
+                    myPlayerId={me?.id}
+                  />
+
+                  <div className="tv-links">
+                    <Link to="/sessions">Back to live games</Link>
+                    <Link to="/games">Play another game</Link>
+                  </div>
+                </>
+              )}
+            </div>
           </fieldset>
 
           {!me && !amTrebek && canJoin && joinMode !== 'watch' && (
@@ -313,7 +322,6 @@ function LiveSession({
         lockedOut={lockedOut}
         badges={badges}
         leavingLabel={isOver ? 'Left' : 'Leaving'}
-        scores={reveal?.scores ?? NO_SCORES}
         isConnected={isConnected}
         canBuzz={canBuzz}
         onBuzz={actions.buzz}

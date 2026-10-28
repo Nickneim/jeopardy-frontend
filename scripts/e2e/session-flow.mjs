@@ -58,6 +58,12 @@ async function main() {
     state.joinScore === 0 && state.players.every(p => p.leaving === false) &&
     state.players.every(p => p.away === true),
     JSON.stringify({ timers: state.timers, allowLateJoin: state.allowLateJoin }))
+  check('timers start at their defaults, title card and Daily Double announcement included',
+    state.timers.roundIntroMs === 6000 && state.timers.dailyDoubleRevealMs === 6000 &&
+    state.timers.clueRevealMs === 8000 && state.timers.answerRevealMs === 8000 &&
+    state.timerModes?.roundIntroMs === 'AUTOMATIC' &&
+    state.timerModes?.dailyDoubleRevealMs === 'AUTOMATIC',
+    JSON.stringify({ timers: state.timers, timerModes: state.timerModes }))
 
   const watcher = connect(id, null)
   const a = connect(id, alice.token)
@@ -123,8 +129,14 @@ async function main() {
   check('host update-settings broadcasts', watcher.latest()?.allowLateJoin === false)
 
   a.send('start')
-  await waitFor(() => watcher.latest()?.state === 'CHOOSING_CLUE')
-  check('host starts game', watcher.latest()?.state === 'CHOOSING_CLUE')
+  await waitFor(() => watcher.latest()?.state === 'ROUND_INTRO')
+  state = watcher.latest()
+  check("host starts game on Jeopardy's title card",
+    state?.state === 'ROUND_INTRO' && state.round === 'JEOPARDY' &&
+    state.playerChoosingClue === alice.playerId && state.phaseDurationMs === 6000,
+    JSON.stringify({ state: state?.state, round: state?.round, phaseDurationMs: state?.phaseDurationMs }))
+  await waitFor(() => watcher.latest()?.state === 'CHOOSING_CLUE', 8000)
+  check('the title card ends on its own', watcher.latest()?.state === 'CHOOSING_CLUE')
 
   const late = await api('POST', sessionPath(id, '/players'), { playerName: 'Dave' })
   check('late join refused with 409 SESSION_NOT_JOINABLE + message',
@@ -173,7 +185,7 @@ async function main() {
   const c1 = connect(s2, p1.token)
   await waitFor(() => w2.connected && c1.connected)
   c1.send('start')
-  await waitFor(() => w2.latest()?.state === 'CHOOSING_CLUE')
+  await waitFor(() => w2.latest()?.state === 'CHOOSING_CLUE', 8000)
   c1.send('leave')
   await waitFor(() => w2.latest()?.hostPlayerId === p2.playerId)
   const snap = w2.latest()

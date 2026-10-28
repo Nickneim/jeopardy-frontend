@@ -1,6 +1,7 @@
 // Plays a whole Trebek game (api.md §6.8) with real STOMP clients, on a tiny
 // custom show: one clue, one Daily Double and Final Jeopardy. Checks the
-// lobby switch, every Trebek action, rulings, pausing, the step-by-step
+// lobby switch, every Trebek action (ending title cards and Daily Double
+// announcements early too), rulings, pausing, the step-by-step
 // Final Jeopardy reveal, that no secret reaches the public snapshot or
 // anyone but Trebek, and that Trebek leaving mid-game ends it.
 //
@@ -110,8 +111,18 @@ async function main() {
   check("a player sending Trebek's advance → NOT_HOST", notHost?.code === 'NOT_HOST')
 
   t.send('start')
+  await inState('ROUND_INTRO')
+  s = now()
+  check("the game opens on Jeopardy's title card, chooser already set",
+    s.round === 'JEOPARDY' && s.playerChoosingClue === bob.playerId &&
+    s.phaseDurationMs === s.timers.roundIntroMs, JSON.stringify({ round: s.round, phaseDurationMs: s.phaseDurationMs }))
+  const choosingTooSoon = await expectError(b, 'choose-clue', { clueId: 1 })
+  check('choosing during the title card → INVALID_STATE', choosingTooSoon?.code === 'INVALID_STATE',
+    JSON.stringify(choosingTooSoon))
+  t.send('advance')
   await inState('CHOOSING_CLUE')
-  check('the lowest player id chooses first', now().playerChoosingClue === bob.playerId)
+  check("Trebek's advance ends the title card; the lowest player id chooses first",
+    now().playerChoosingClue === bob.playerId)
 
   // ---------- A picked clue ----------
   b.send('choose-clue', { clueId: 1 })
@@ -215,7 +226,19 @@ async function main() {
   await waitFor(() => viewOf(t, now())?.clue?.dailyDouble === true)
   check('Trebek knows it is a Daily Double', viewOf(t, now())?.clue?.dailyDouble === true)
   t.send('advance')
+  await inState('REVEALING_DAILY_DOUBLE')
+  s = now()
+  check('advance announces the Daily Double, its question and wager range still hidden',
+    s.currentClue.dailyDouble === true && s.currentClue.question === null &&
+    s.currentClue.minWager === null && s.currentClue.maxWager === null &&
+    s.phaseDurationMs === s.timers.dailyDoubleRevealMs, JSON.stringify(s.currentClue))
+  const wagerTooSoon = await expectError(b, 'place-daily-double-wager', { wager: 5 })
+  check('wagering during the announcement → INVALID_STATE', wagerTooSoon?.code === 'INVALID_STATE',
+    JSON.stringify(wagerTooSoon))
+  t.send('advance')
   await inState('WAITING_FOR_DAILY_DOUBLE_WAGER')
+  check('advance starts the wager, with its range',
+    now().currentClue.minWager === 5 && now().currentClue.maxWager !== null)
   t.send('place-daily-double-wager', { wager: 5 })
   await inState('REVEALING_CLUE')
   check('Trebek places the wager for the chooser', now().currentClue.wager === 5)
@@ -232,6 +255,12 @@ async function main() {
   check('a correct Daily Double ruling adds the wager', score(bob.playerId) === 205)
 
   // ---------- Final Jeopardy ----------
+  // Double Jeopardy has no clues, so it's skipped, title card included.
+  t.send('advance')
+  await inState('ROUND_INTRO')
+  check("Final Jeopardy's title card comes next, with nobody choosing",
+    now().round === 'FINAL_JEOPARDY' && now().playerChoosingClue === null &&
+    !watcher.snapshots.some(x => x.state === 'ROUND_INTRO' && x.round === 'DOUBLE_JEOPARDY'))
   t.send('advance')
   await inState('FINAL_JEOPARDY_WAGERING')
   b.send('place-final-jeopardy-wager', { wager: 100 })
@@ -309,7 +338,7 @@ async function main() {
   t2.send('update-settings', { hostMode: 'TREBEK' })
   await waitFor(() => w2.latest()?.hostMode === 'TREBEK')
   t2.send('start')
-  await waitFor(() => w2.latest()?.state === 'CHOOSING_CLUE')
+  await waitFor(() => w2.latest()?.state === 'ROUND_INTRO')
   t2.send('leave')
   await waitFor(() => w2.latest()?.state === 'CLOSED')
   check('Trebek leaving mid-game closes it as TREBEK_LEFT, with the scores',

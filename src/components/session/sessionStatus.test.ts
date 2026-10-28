@@ -19,6 +19,32 @@ describe('sessionStatus', () => {
       .toEqual({ who: 'Alice', message: 'is choosing a clue' })
   })
 
+  test("says who picks first during a round's title card", () => {
+    const session = makeSession({
+      state: 'ROUND_INTRO',
+      round: 'DOUBLE_JEOPARDY',
+      players: [alice, bob],
+      playerChoosingClue: 2,
+    })
+
+    expect(sessionStatus(session, alice)).toEqual({ who: 'Bob', message: 'picks first' })
+    expect(sessionStatus(session, bob))
+      .toEqual({ who: null, message: 'Get ready · you pick first' })
+    expect(sessionStatus({ ...session, round: 'FINAL_JEOPARDY', playerChoosingClue: null }, alice))
+      .toEqual({ who: null, message: 'Get ready' })
+  })
+
+  test('announces who found a Daily Double', () => {
+    const session = makeSession({
+      state: 'REVEALING_DAILY_DOUBLE',
+      players: [alice, bob],
+      playerChoosingClue: 1,
+    })
+
+    expect(sessionStatus(session, alice).message).toBe('Daily Double · get ready to wager')
+    expect(sessionStatus(session, bob)).toEqual({ who: 'Alice', message: 'found a Daily Double' })
+  })
+
   test('tells a locked-out player they already buzzed', () => {
     const session = makeSession({
       state: 'WAITING_FOR_BUZZER',

@@ -8,30 +8,35 @@ import {
   type TimerMode,
 } from '../../api/sessions'
 
+// In the order the phases come up in a game.
 const TIMER_LABELS: Record<keyof SessionTimers, string> = {
+  roundIntroMs: 'Round title card',
   clueChoiceMs: 'Choosing a clue',
   clueRevealMs: 'Clue reveal',
+  dailyDoubleRevealMs: 'Daily Double announcement',
   dailyDoubleWagerMs: 'Daily Double wager',
   buzzerMs: 'Buzzer',
   answerMs: 'Answer',
   answerRevealMs: 'Answer reveal',
   finalJeopardyWagerMs: 'Final Jeopardy wager',
   finalJeopardyAnswerMs: 'Final Jeopardy answer',
-  finalJeopardyRevealMs: 'Final Jeopardy reveal',
+  finalJeopardyRevealMs: 'Final Jeopardy reveal, per player',
 }
 
 // What happens in a Trebek game when the phase ends on its own, and what it
 // waits for when Trebek runs it.
 const MODE_HINTS: Record<keyof SessionTimers, Record<TimerMode, string>> = {
+  roundIntroMs: { AUTOMATIC: 'Then the round begins', TREBEK: 'Until you begin the round' },
   clueChoiceMs: { AUTOMATIC: 'Then a clue is picked for them', TREBEK: 'No limit · you can pick for them' },
   clueRevealMs: { AUTOMATIC: 'Then the buzzers open', TREBEK: 'Until you open the buzzers' },
+  dailyDoubleRevealMs: { AUTOMATIC: 'Then the wager starts', TREBEK: 'Until you start the wager' },
   dailyDoubleWagerMs: { AUTOMATIC: 'Then the lowest wager locks', TREBEK: 'Until you lock the wager' },
   buzzerMs: { AUTOMATIC: 'Then nobody buzzed', TREBEK: 'Until you close the buzzers' },
   answerMs: { AUTOMATIC: 'Then typing closes · you still rule', TREBEK: 'Until you rule' },
   answerRevealMs: { AUTOMATIC: 'Then back to the board', TREBEK: 'Until you go back to the board' },
   finalJeopardyWagerMs: { AUTOMATIC: 'Then wagers lock', TREBEK: 'Until you lock wagers' },
   finalJeopardyAnswerMs: { AUTOMATIC: 'Then answers lock · you still rule', TREBEK: 'Until you lock answers' },
-  finalJeopardyRevealMs: { AUTOMATIC: 'Split across the players · waits for your rulings', TREBEK: 'You reveal each player' },
+  finalJeopardyRevealMs: { AUTOMATIC: 'Split over their wager, answer and award · waits for your rulings', TREBEK: 'You reveal each player' },
 }
 
 const TIMER_FIELDS = Object.keys(TIMER_LABELS) as (keyof SessionTimers)[]

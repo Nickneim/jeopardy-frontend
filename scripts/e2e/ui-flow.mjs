@@ -266,7 +266,14 @@ try {
   // Start; late joining is off.
   await alice.waitConnected()
   await alice.click('Start game')
-  check('game starts for both', await alice.waitText('Your pick · choose a clue') &&
+  check("game starts on Jeopardy's title card, without the board",
+    await alice.waitText('Get ready · you pick first') &&
+    await bob.waitText('Alice picks first') &&
+    await bob.eval(`document.querySelector('.tv-title.is-card')?.textContent === 'Jeopardy!' &&
+      !document.querySelector('.tv-board-cell')`))
+  await bob.screenshot('round-intro.png')
+  // The title card lasts roundIntroMs (6 s by default).
+  check('then the round begins for both', await alice.waitText('Your pick · choose a clue', 10000) &&
     await bob.waitText('Alice is choosing a clue'))
   check('outsider sees "doesn\'t accept new players"',
     await carol.waitText("doesn't accept new players"))
@@ -300,7 +307,7 @@ try {
   await alice.waitText('Start game')
   await alice.waitConnected()
   await alice.click('Start game')
-  await alice.waitText('Your pick · choose a clue')
+  await alice.waitText('Your pick · choose a clue', 10000)
   const url2 = await alice.eval('location.href')
   await frank.goto(`${APP}/sessions`)
   await frank.waitText('Alice')
@@ -346,7 +353,10 @@ try {
     await grace.waitText('Host desk') && await grace.waitText('Your host') &&
     !(await grace.eval(`!!document.querySelector('.podium.is-me')`)))
 
-  await henry.waitText('Your pick · choose a clue')
+  await grace.waitText('Begin the round')
+  await grace.click('Begin the round')
+  check("Trebek ends the title card early",
+    await henry.waitText('Your pick · choose a clue', 3000))
   await henry.eval(`document.querySelector('button.tv-board-cell:not(:disabled)').click()`)
   check('Trebek gets the picked clue first',
     await grace.waitText('Show the clue to everyone'))

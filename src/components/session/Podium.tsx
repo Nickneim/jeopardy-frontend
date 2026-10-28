@@ -8,8 +8,6 @@ export const PODIUM_LIGHTS = 9
 
 interface PodiumProps {
   player: Player
-  // Shown instead of the player's score during the Final Jeopardy reveal.
-  score: number
   isMe: boolean
   // Choosing, answering, wagering on a Daily Double, or being revealed.
   isActive: boolean
@@ -34,7 +32,6 @@ interface PodiumProps {
 
 function Podium({
   player,
-  score,
   isMe,
   isActive,
   lights,
@@ -57,6 +54,7 @@ function Podium({
     isAway && !isLeaving && 'is-away',
   ].filter(Boolean).join(' ')
 
+  const score = player.score
   const label = isLeaving ? leavingLabel : badge ?? (isAway ? 'Away' : null)
 
   // The lights go out from both ends towards the middle.

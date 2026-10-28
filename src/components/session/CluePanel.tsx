@@ -6,6 +6,7 @@ import ClueQuestion from '../ClueQuestion'
 import AnswerForm from './AnswerForm'
 import ClueAnswers from './ClueAnswers'
 import CorrectResponse from './CorrectResponse'
+import TitleCard from './TitleCard'
 import WagerForm from './WagerForm'
 
 interface CluePanelProps {
@@ -15,7 +16,7 @@ interface CluePanelProps {
 }
 
 // The main screen while a clue is in play: from the pick (in a Trebek game)
-// or a Daily Double's wager to the answer reveal. Buzzing is on the
+// or a Daily Double's announcement to the answer reveal. Buzzing is on the
 // player's podium. Trebek sees this too, with their desk beside it.
 function CluePanel({
   session,
@@ -48,6 +49,32 @@ function CluePanel({
   const isRevealing = session.state === 'REVEALING_ANSWER'
   const isRuling = session.state === 'WAITING_FOR_RULING'
   const hasAnswers = session.clueAnswers.length > 0
+
+  // A Daily Double is announced before the wager, with nothing to play.
+  if (session.state === 'REVEALING_DAILY_DOUBLE') {
+    return (
+      <>
+        <p className="tv-heading">
+          <span>{category?.name}</span>
+        </p>
+
+        <TitleCard title="Daily Double!" />
+
+        <p className="tv-waiting">
+          {me !== null && session.playerChoosingClue === me.id
+            ? <span>You found it!</span>
+            : (
+              <>
+                <span className="tv-hand">
+                  {playerName(session.playerChoosingClue)}
+                </span>
+                <span>found it!</span>
+              </>
+            )}
+        </p>
+      </>
+    )
+  }
 
   if (isPicked) {
     return (

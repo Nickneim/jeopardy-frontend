@@ -92,6 +92,27 @@ describe('TrebekDesk', () => {
     expect(actions.returnClue).toHaveBeenCalledOnce()
   })
 
+  test("ends a round's title card early", async () => {
+    const actions = renderDesk(
+      trebekSession({ state: 'ROUND_INTRO', currentClue: null }),
+      view({ clue: null }),
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Begin the round' }))
+    expect(actions.advance).toHaveBeenCalledOnce()
+  })
+
+  test("ends a Daily Double's announcement early, to start the wager", async () => {
+    const session = trebekSession({ state: 'REVEALING_DAILY_DOUBLE' })
+    const actions = renderDesk(
+      { ...session, currentClue: { ...session.currentClue!, dailyDouble: true } },
+      view({ clue: { ...CLUE, dailyDouble: true } }),
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ask Alice for a wager' }))
+    expect(actions.advance).toHaveBeenCalledOnce()
+  })
+
   test("doesn't show the clue of a view that lags behind", () => {
     renderDesk(
       trebekSession({ state: 'CLUE_PICKED' }),
