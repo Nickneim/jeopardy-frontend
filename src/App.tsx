@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet, useMatch } from 'react-router'
+import { Link, NavLink, Outlet, ScrollRestoration, useMatch } from 'react-router'
 
 function App() {
   // A live game uses the whole page; its status bar links home instead. The
@@ -18,6 +18,10 @@ function App() {
       )}
 
       <Outlet />
+
+      {/* A new page starts at the top; back and forward return to where
+          you were. */}
+      <ScrollRestoration />
     </>
   )
 }
