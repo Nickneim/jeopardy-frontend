@@ -1286,3 +1286,81 @@
 .custom-final-preview .custom-screen {
   box-shadow: inset 0 0 160px rgba(0, 0, 0, 0.6);
 }
+
+/* A phone: no clue preview while editing, and importing one step at a time. */
+@media (max-width: 640px) {
+  .custom-dialog-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .custom-dialog-preview {
+    display: none;
+  }
+
+  .custom-dialog-footer {
+    flex-wrap: wrap;
+  }
+
+  .custom-dialog-footer > .custom-help {
+    flex-basis: 100%;
+    order: -1;
+  }
+
+  .custom-overlay {
+    padding: 8px;
+  }
+
+  .custom-dialog {
+    padding: 16px;
+  }
+
+  /* The title on its own line, then the blind switch and Close. */
+  .custom-dialog-header {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .custom-dialog-header > div {
+    flex-basis: 100%;
+  }
+
+  .custom-dialog-header > :last-child {
+    margin-left: auto;
+  }
+
+  .custom-dialog-title {
+    font-size: 28px;
+  }
+
+  /* One step at a time (ImportDialog): the games, or a game's categories. */
+  .custom-import-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .custom-import-back {
+    align-self: flex-start;
+  }
+
+  .custom-category-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .custom-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* The value and media badge, then the clue and response under them. */
+  .custom-preview-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+
+  .custom-preview-row > :last-child {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .custom-preview-row > :not(:first-child, :last-child) {
+    grid-column: 1 / -1;
+  }
+}

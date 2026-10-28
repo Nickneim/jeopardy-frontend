@@ -388,7 +388,10 @@ a.home-tile:hover {
   color: #fff;
 }
 
+/* Positioned so the visually hidden header labels (absolute) scroll inside
+   it instead of widening the page, which zooms phones out. */
 .table-box {
+  position: relative;
   overflow-x: auto;
   border-radius: 4px;
   box-shadow: 0 0 0 4px #000, 0 0 0 6px #1a1a1a;

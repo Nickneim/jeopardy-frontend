@@ -2,9 +2,10 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import type { Player, Trebek } from '../../api/sessions'
 import Podium from './Podium'
 
-// Up to this many players share the row; with more, yours stays on the left
-// and the others scroll.
+// Up to this many players share the row (fewer on a phone); with more, yours
+// stays on the left and the others scroll.
 const MAX_FITTING = 4
+const MAX_FITTING_COMPACT = 2
 // The edge fade over the last visible podium.
 const FADE_PX = 64
 
@@ -25,8 +26,12 @@ interface PodiumRowProps {
   onBuzz: () => void
   // Only given to the host.
   onKick?: (player: Player) => void
-  // The buttons on the right: join, share, leave.
+  // Joining as a spectator, before the buttons (under the row on a phone).
+  joining?: ReactNode
+  // The buttons on the right: share, leave.
   actions: ReactNode
+  // On a phone: fewer, wider podiums.
+  compact?: boolean
 }
 
 function PodiumRow({
@@ -42,11 +47,14 @@ function PodiumRow({
   canBuzz,
   onBuzz,
   onKick,
+  joining,
   actions,
+  compact = false,
 }: PodiumRowProps) {
   const scrollerRef = useRef<HTMLUListElement>(null)
 
-  const scrolls = players.length > MAX_FITTING
+  const scrolls = players.length >
+    (compact ? MAX_FITTING_COMPACT : MAX_FITTING)
   const mine = players.find(player => player.id === me?.id) ?? null
   const others = players.filter(player => player !== mine)
   const pinned = scrolls ? mine : null
@@ -147,7 +155,10 @@ function PodiumRow({
         </ul>
       </div>
 
-      <div className="podium-actions">{actions}</div>
+      <div className="podium-actions">
+        {joining && <div className="podium-joining">{joining}</div>}
+        <div className="podium-buttons">{actions}</div>
+      </div>
     </div>
   )
 }

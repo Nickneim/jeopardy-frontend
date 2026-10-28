@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LinkIcon } from './icons'
+import { CheckIcon, LinkIcon } from './icons'
 
 // Copies the page's link, for inviting players or spectators.
 function ShareLinkButton() {
@@ -16,8 +16,9 @@ function ShareLinkButton() {
 
   return (
     <button type="button" className="tv-action" onClick={copyLink}>
-      <LinkIcon />
-      {copied ? 'Link copied' : 'Share link'}
+      {copied ? <CheckIcon size={20} /> : <LinkIcon />}
+      {/* Only the icon on a phone. */}
+      <span className="tv-action-label">{copied ? 'Link copied' : 'Share link'}</span>
     </button>
   )
 }

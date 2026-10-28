@@ -35,11 +35,13 @@ import { sessionStatus } from '../components/session/sessionStatus'
 import ShareLinkButton from '../components/session/ShareLinkButton'
 import StatusBar from '../components/session/StatusBar'
 import TitleCard from '../components/session/TitleCard'
+import Timer from '../components/session/Timer'
 import TrebekDesk from '../components/session/TrebekDesk'
 import { ROUND_NAMES } from '../format'
 import { useClueZoom } from '../hooks/useClueZoom'
 import { useCountdown } from '../hooks/useCountdown'
 import { useGameSession, type SessionEnd } from '../hooks/useGameSession'
+import { PHONE_QUERY, useMediaQuery } from '../hooks/useMediaQuery'
 import { linkedJoinMode, type JoinMode } from '../navigation'
 
 const CLUE_STATES = new Set<GameSessionState>([
@@ -108,6 +110,7 @@ function LiveSession({
     receivedAt,
     session.paused,
   )
+  const isPhone = useMediaQuery(PHONE_QUERY)
   const screenRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   useClueZoom(
@@ -201,6 +204,24 @@ function LiveSession({
     ? Math.ceil((PODIUM_LIGHTS * leftMs) / session.phaseDurationMs)
     : 0
 
+  const hasTimer = leftMs !== null && Boolean(session.phaseDurationMs)
+  // The clue in play's category, open on a phone's board behind the clue so
+  // the clue grows out of its cell.
+  const clueColumn = session.board.findIndex(category => category.slots
+    .some(slot => slot.clueId === session.currentClue?.clueId))
+
+  const statusBar = (
+    <StatusBar
+      round={state === 'WAITING_FOR_START' ? null : ROUND_NAMES[session.round]}
+      status={sessionStatus(session, me, amTrebek)}
+      durationMs={session.phaseDurationMs}
+      // On a phone the timer is on the screen.
+      leftMs={isPhone ? null : leftMs}
+      paused={session.paused}
+      transient={isPhone}
+    />
+  )
+
   // Who has wagered or answered in Final Jeopardy is public; what isn't.
   const badges = new Map<number, string>()
   for (const result of session.finalJeopardy?.players ?? []) {
@@ -234,7 +255,13 @@ function LiveSession({
           {CLUE_STATES.has(state) && (
             <div className="tv-screen is-board tv-screen-behind" aria-hidden="true" inert>
               <div ref={boardRef} className="tv-screen-content">
-                <SessionBoard board={session.board} canChoose={false} onChoose={() => {}} />
+                <SessionBoard
+                  board={session.board}
+                  canChoose={false}
+                  onChoose={() => {}}
+                  compact={isPhone}
+                  openColumn={clueColumn < 0 ? null : clueColumn}
+                />
               </div>
             </div>
           )}
@@ -276,6 +303,7 @@ function LiveSession({
                     // Trebek can pick for the chooser, a clue they named out loud.
                     canChoose={isMyChoice || amTrebek}
                     onChoose={actions.chooseClue}
+                    compact={isPhone}
                   />
                 )}
 
@@ -319,6 +347,19 @@ function LiveSession({
                 />
               </div>
             )}
+
+            {/* On a phone the countdown is at the top of the screen, and the
+                status bar over its bottom for a moment after each change. */}
+            {isPhone && hasTimer && (
+              <Timer
+                className="tv-screen-timer"
+                durationMs={session.phaseDurationMs!}
+                leftMs={leftMs!}
+                paused={session.paused}
+              />
+            )}
+
+            {isPhone && statusBar}
           </div>
         </div>
 
@@ -329,13 +370,7 @@ function LiveSession({
         )}
       </div>
 
-      <StatusBar
-        round={state === 'WAITING_FOR_START' ? null : ROUND_NAMES[session.round]}
-        status={sessionStatus(session, me, amTrebek)}
-        durationMs={session.phaseDurationMs}
-        leftMs={leftMs}
-        paused={session.paused}
-      />
+      {!isPhone && statusBar}
 
       <PodiumRow
         players={session.players}
@@ -350,21 +385,21 @@ function LiveSession({
         canBuzz={canBuzz}
         onBuzz={actions.buzz}
         onKick={isHost ? kick : undefined}
-        actions={
+        compact={isPhone}
+        joining={!me && !amTrebek && !isOver &&
+          (!canJoin || joinMode === 'watch') && (
           <>
             {/* Spectating is said here, by the buttons, not on the screen. */}
-            {!me && !amTrebek && !isOver && (!canJoin || joinMode === 'watch') && (
-              <div className="podium-actions-note">
-                <JoinChoice
-                  canJoin={canJoin}
-                  joinScore={session.joinScore}
-                  mode={joinMode}
-                  onModeChange={setJoinMode}
-                />
-              </div>
-            )}
+            <div className="podium-actions-note">
+              <JoinChoice
+                canJoin={canJoin}
+                joinScore={session.joinScore}
+                mode={joinMode}
+                onModeChange={setJoinMode}
+              />
+            </div>
 
-            {!me && !amTrebek && canJoin && joinMode === 'watch' && (
+            {canJoin && (
               <button
                 type="button"
                 className="tv-action is-primary"
@@ -374,14 +409,17 @@ function LiveSession({
                 Join as player
               </button>
             )}
-
+          </>
+        )}
+        actions={
+          <>
             <ShareLinkButton />
 
             {/* Trebek can always leave: during the game it ends it. */}
             {((me && !isOver) || amTrebek) && (
               <ConfirmButton
                 label="Leave"
-                content={<><LeaveIcon />Leave</>}
+                content={<><LeaveIcon /><span className="tv-action-label">Leave</span></>}
                 question={leaveQuestion}
                 confirmLabel="Yes, leave"
                 className="tv-action"

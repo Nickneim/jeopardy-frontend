@@ -14,6 +14,7 @@ import {
   type PageResponse,
 } from '../../api/games'
 import { formatAirDate, formatMoney } from '../../format'
+import { PHONE_QUERY, useMediaQuery } from '../../hooks/useMediaQuery'
 import ClueQuestion from '../ClueQuestion'
 import { CrossIcon } from '../session/icons'
 import { MediaBadge } from './ClueBadges'
@@ -62,6 +63,10 @@ function ImportDialog({
   const [loadingGameId, setLoadingGameId] = useState<number | null>(null)
   const [gameError, setGameError] = useState<string | null>(null)
   const [category, setCategory] = useState<GameCategory | null>(null)
+  // A phone shows the games, then the picked game's categories.
+  const isPhone = useMediaQuery(PHONE_QUERY)
+  const showsDetail = !isPhone || game !== null || gameError !== null
+  const showsGames = !isPhone || !showsDetail
 
   const resultsKey = `${search}|${page}`
 
@@ -108,6 +113,12 @@ function ImportDialog({
     }
   }
 
+  function backToGames() {
+    setGame(null)
+    setGameError(null)
+    setCategory(null)
+  }
+
   function closeOnEscape(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       event.stopPropagation()
@@ -148,131 +159,141 @@ function ImportDialog({
         </div>
 
         <div className="custom-import-body">
-          <div className="custom-import-games">
-            <form className="custom-search" role="search" onSubmit={submitSearch}>
-              <label className="custom-field">
-                <span className="custom-label">
-                  {isFinal ? 'Search Final Jeopardy! categories' : 'Search games'}
-                </span>
-                <span className="custom-media-row">
-                  <input
-                    type="search"
-                    autoFocus
-                    value={query}
-                    placeholder={isFinal ? 'Word origins' : 'Show #8612'}
-                    onChange={event => setQuery(event.target.value)}
-                  />
-                  <button type="submit" className="outline-button" aria-label="Search">
-                    <SearchIcon />
-                  </button>
-                </span>
-              </label>
-            </form>
-
-            {loading && <p className="custom-help">Loading games…</p>}
-            {results?.error && !loading && (
-              <p className="form-error" role="alert">{results.error}</p>
-            )}
-
-            {games && (
-              <>
-                {games.content.length === 0 && (
-                  <p className="custom-help">No games match.</p>
-                )}
-                <ul className="custom-game-list">
-                  {games.content.map(summary => (
-                    <li key={summary.id}>
-                      <button
-                        type="button"
-                        className={`custom-game ${game?.id === summary.id ? 'is-picked' : ''}`}
-                        aria-pressed={game?.id === summary.id}
-                        disabled={isFinal && summary.finalCategory === null}
-                        onClick={() => void pickGame(summary)}
-                      >
-                        <span className="custom-game-title">{summary.title.split(' - ')[0]}</span>
-                        <span className="custom-game-meta">
-                          Season {summary.season} · {formatAirDate(summary.gameDate)}
-                        </span>
-                        {isFinal && (
-                          <span className="custom-game-final">
-                            {summary.finalCategory ?? 'No Final Jeopardy!'}
-                          </span>
-                        )}
-                        {loadingGameId === summary.id && (
-                          <span className="custom-game-meta">Loading…</span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="custom-pages">
-                  <button
-                    type="button"
-                    className="outline-button"
-                    disabled={games.page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    Newer
-                  </button>
-                  <span className="custom-help">
-                    Page {games.page + 1} of {Math.max(games.totalPages, 1)}
+          {showsGames && (
+            <div className="custom-import-games">
+              <form className="custom-search" role="search" onSubmit={submitSearch}>
+                <label className="custom-field">
+                  <span className="custom-label">
+                    {isFinal ? 'Search Final Jeopardy! categories' : 'Search games'}
                   </span>
-                  <button
-                    type="button"
-                    className="outline-button"
-                    disabled={games.page + 1 >= games.totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Older
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                  <span className="custom-media-row">
+                    <input
+                      type="search"
+                      autoFocus
+                      value={query}
+                      placeholder={isFinal ? 'Word origins' : 'Show #8612'}
+                      onChange={event => setQuery(event.target.value)}
+                    />
+                    <button type="submit" className="outline-button" aria-label="Search">
+                      <SearchIcon />
+                    </button>
+                  </span>
+                </label>
+              </form>
 
-          <div className="custom-import-detail">
-            {gameError && <p className="form-error" role="alert">{gameError}</p>}
+              {loading && <p className="custom-help">Loading games…</p>}
+              {results?.error && !loading && (
+                <p className="form-error" role="alert">{results.error}</p>
+              )}
 
-            {!game && !gameError && (
-              <p className="custom-help">
-                {isFinal
-                  ? 'Pick a game to see its Final Jeopardy!.'
-                  : 'Pick a game to see its categories.'}
-              </p>
-            )}
+              {games && (
+                <>
+                  {games.content.length === 0 && (
+                    <p className="custom-help">No games match.</p>
+                  )}
+                  <ul className="custom-game-list">
+                    {games.content.map(summary => (
+                      <li key={summary.id}>
+                        <button
+                          type="button"
+                          className={`custom-game ${game?.id === summary.id ? 'is-picked' : ''}`}
+                          aria-pressed={game?.id === summary.id}
+                          disabled={isFinal && summary.finalCategory === null}
+                          onClick={() => void pickGame(summary)}
+                        >
+                          <span className="custom-game-title">{summary.title.split(' - ')[0]}</span>
+                          <span className="custom-game-meta">
+                            Season {summary.season} · {formatAirDate(summary.gameDate)}
+                          </span>
+                          {isFinal && (
+                            <span className="custom-game-final">
+                              {summary.finalCategory ?? 'No Final Jeopardy!'}
+                            </span>
+                          )}
+                          {loadingGameId === summary.id && (
+                            <span className="custom-game-meta">Loading…</span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
 
-            {game && !isFinal && (
-              <CategoryPicker
-                game={game}
-                picked={category}
-                usedCategoryIds={usedCategoryIds}
-                onPick={setCategory}
-              />
-            )}
+                  <div className="custom-pages">
+                    <button
+                      type="button"
+                      className="outline-button"
+                      disabled={games.page === 0}
+                      onClick={() => setPage(page - 1)}
+                    >
+                      Newer
+                    </button>
+                    <span className="custom-help">
+                      Page {games.page + 1} of {Math.max(games.totalPages, 1)}
+                    </span>
+                    <button
+                      type="button"
+                      className="outline-button"
+                      disabled={games.page + 1 >= games.totalPages}
+                      onClick={() => setPage(page + 1)}
+                    >
+                      Older
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
-            {game && category && target.kind === 'category' && (
-              <CategoryPreview
-                category={category}
-                round={target.position.round}
-                blind={blind}
-              />
-            )}
+          {showsDetail && (
+            <div className="custom-import-detail">
+              {isPhone && (
+                <button type="button" className="outline-button custom-import-back" onClick={backToGames}>
+                  ‹ Games
+                </button>
+              )}
 
-            {game && isFinal && (
-              category && finalClue
-                ? (
-                  <FinalPreview
-                    category={category}
-                    question={finalClue.question}
-                    answer={finalClue.answer}
-                    used={usedCategoryIds.has(category.id)}
-                    blind={blind}
-                  />
-                )
-                : <p className="custom-help">This game has no Final Jeopardy! clue.</p>
-            )}
-          </div>
+              {gameError && <p className="form-error" role="alert">{gameError}</p>}
+
+              {!game && !gameError && (
+                <p className="custom-help">
+                  {isFinal
+                    ? 'Pick a game to see its Final Jeopardy!.'
+                    : 'Pick a game to see its categories.'}
+                </p>
+              )}
+
+              {game && !isFinal && (
+                <CategoryPicker
+                  game={game}
+                  picked={category}
+                  usedCategoryIds={usedCategoryIds}
+                  onPick={setCategory}
+                />
+              )}
+
+              {game && category && target.kind === 'category' && (
+                <CategoryPreview
+                  category={category}
+                  round={target.position.round}
+                  blind={blind}
+                />
+              )}
+
+              {game && isFinal && (
+                category && finalClue
+                  ? (
+                    <FinalPreview
+                      category={category}
+                      question={finalClue.question}
+                      answer={finalClue.answer}
+                      used={usedCategoryIds.has(category.id)}
+                      blind={blind}
+                    />
+                  )
+                  : <p className="custom-help">This game has no Final Jeopardy! clue.</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="custom-dialog-footer">

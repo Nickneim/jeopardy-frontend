@@ -573,6 +573,101 @@
   background: var(--tv-button-blue);
 }
 
+/* A phone's board: the categories, then one category's clues. */
+
+.tv-board-compact {
+  flex-grow: 1;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Leaves room for the timer in the corner. */
+.tv-board-compact-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 0 60px 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.tv-board-compact-title {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tv-stage .tv-board-back {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 16px;
+}
+
+.tv-board-compact-categories {
+  flex-grow: 1;
+  display: grid;
+  grid-auto-rows: minmax(64px, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tv-board-compact-categories li {
+  display: flex;
+}
+
+.tv-stage .tv-board-compact-categories .tv-board-category {
+  flex-grow: 1;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--tv-blue);
+  color: #fff;
+  font: 600 22px var(--tv-sans);
+  text-transform: uppercase;
+}
+
+.tv-stage .tv-board-compact-categories .tv-board-category:not(:disabled):hover {
+  background: var(--tv-button-blue);
+}
+
+.tv-stage .tv-board-compact-categories .tv-board-category:disabled {
+  opacity: 0.45;
+}
+
+.tv-board-count {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--tv-gold);
+  text-shadow: 2px 2px 0 #000;
+}
+
+.tv-board-compact-clues {
+  flex-grow: 1;
+  display: grid;
+  grid-auto-rows: minmax(64px, 1fr);
+  gap: 6px;
+}
+
+.tv-stage .tv-board-compact-clues .tv-board-cell {
+  font-size: 40px;
+}
+
+.tv-board-compact .tv-comments {
+  margin: 0 8px;
+}
+
 /* The status bar */
 
 .tv-status {
@@ -636,37 +731,57 @@
 }
 
 .tv-timer {
+  position: relative;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+
+.tv-timer svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tv-timer circle {
+  fill: none;
+  stroke-width: 5;
 }
 
 .tv-timer-track {
-  width: clamp(80px, 20vw, 260px);
-  height: 8px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #262626;
+  stroke: #262626;
 }
 
-.tv-timer-bar {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--tv-light);
-  transition: width 0.1s linear;
+.tv-timer-ring {
+  stroke: var(--tv-light);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.1s linear;
 }
 
-.tv-timer.is-ending .tv-timer-bar {
-  background: var(--tv-wrong);
+.tv-timer.is-ending .tv-timer-ring {
+  stroke: var(--tv-wrong);
 }
 
 .tv-timer-seconds {
-  width: 40px;
-  font-size: 20px;
+  position: relative;
+  font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  line-height: 1;
+}
+
+/* On a phone: the countdown in the screen's top right corner. */
+.tv-screen-timer {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  text-shadow: none;
 }
 
 /* The podium row */
@@ -885,6 +1000,13 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 10px;
+}
+
+.podium-joining,
+.podium-buttons {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -1234,6 +1356,12 @@
 
   .podium-actions {
     flex-basis: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .podium-joining,
+  .podium-buttons {
     flex-direction: row;
     flex-wrap: wrap;
   }
@@ -1668,6 +1796,134 @@
   text-transform: uppercase;
 }
 
-.tv-timer.is-paused .tv-timer-bar {
-  background: #c7c9d1;
+.tv-timer.is-paused .tv-timer-ring {
+  stroke: #c7c9d1;
+}
+
+/* A phone: the status bar comes and goes over the bottom of the screen, the
+   timer is on the screen, the buttons are only icons and the podiums are
+   wider. */
+
+@media (max-width: 640px) {
+  .tv-stage {
+    padding: 4px 4px 12px;
+  }
+
+  .tv-screen {
+    min-height: clamp(400px, 62vh, 620px);
+    padding: 20px 12px 24px;
+  }
+
+  .tv-heading {
+    padding-inline: 48px;
+    font-size: 18px;
+  }
+
+  .tv-status.is-transient {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 1;
+    min-height: 40px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.72);
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .tv-status.is-transient.is-hidden {
+    opacity: 0;
+  }
+
+  .tv-status.is-transient .tv-status-message {
+    flex-wrap: wrap;
+    white-space: normal;
+    font-size: 16px;
+  }
+
+  .tv-status.is-transient .tv-hand {
+    font-size: 26px;
+  }
+
+  .podium-row {
+    position: relative;
+    gap: 8px;
+  }
+
+  .podium-area,
+  .podium-list {
+    gap: 8px;
+  }
+
+  .podium-slot {
+    max-width: none;
+  }
+
+  .podium-list.is-scrolling .podium-slot,
+  .podium-pinned {
+    flex-basis: 168px;
+  }
+
+  .podium {
+    padding: 8px;
+  }
+
+  .podium-screen {
+    height: 48px;
+  }
+
+  .podium-name {
+    padding: 0 4px;
+    font-size: 30px;
+  }
+
+  /* The buttons stay on the right as icons; joining goes under the row. */
+  .podium-actions {
+    display: contents;
+  }
+
+  .podium-buttons {
+    flex: 0 0 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .podium-joining {
+    order: 1;
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .podium-actions .podium-buttons .tv-action {
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+
+  .podium-buttons .tv-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  /* Asking before leaving covers the row. */
+  .podium-actions .podium-buttons .confirm-prompt {
+    position: absolute;
+    inset: 10px 0 0;
+    z-index: 1;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.92);
+    text-align: center;
+  }
 }
