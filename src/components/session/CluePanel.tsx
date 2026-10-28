@@ -139,6 +139,7 @@ function CluePanel({
               round={clueAnswersRound(session)}
               me={me}
               amount={clue.wager ?? clue.value}
+              accepted={clue.acceptedAnswers}
             />
 
             {isMyAnswer && (

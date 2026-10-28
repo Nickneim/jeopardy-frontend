@@ -1,5 +1,5 @@
 import type { FinalJeopardy, Player } from '../../api/sessions'
-import { formatMoney } from '../../format'
+import { formatAcceptedAnswers, formatMoney } from '../../format'
 import type { FinalRevealProgress, RevealShown } from './revealProgress'
 import { CheckIcon, CrossIcon } from './icons'
 
@@ -30,6 +30,12 @@ function FinalReveal({
   const name = players.find(p => p.id === result.playerId)?.name ?? 'Someone'
   const wager = result.wager ?? 0
   const pending = <span className="final-reveal-pending">—</span>
+  // Trebek can rule a player correct who wrote nothing (said out loud):
+  // once awarded, they get the correct response.
+  const response = result.answer ??
+    (result.correct && final.acceptedAnswers
+      ? formatAcceptedAnswers(final.acceptedAnswers)
+      : 'No answer')
 
   return (
     <div className="final-reveal">
@@ -61,7 +67,7 @@ function FinalReveal({
           <dd>
             {shown < 1
               ? pending
-              : <span className="tv-hand">{result.answer ?? 'No answer'}</span>}
+              : <span className="tv-hand">{response}</span>}
           </dd>
 
           <dt>Result</dt>

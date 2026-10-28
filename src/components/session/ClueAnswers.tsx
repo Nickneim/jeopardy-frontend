@@ -1,5 +1,10 @@
-import type { ClueAnswer, GameRound, Player } from '../../api/sessions'
-import { formatMoney } from '../../format'
+import type {
+  AcceptedAnswers,
+  ClueAnswer,
+  GameRound,
+  Player,
+} from '../../api/sessions'
+import { formatAcceptedAnswers, formatMoney } from '../../format'
 import { CheckIcon, CrossIcon } from './icons'
 
 interface ClueAnswersProps {
@@ -10,6 +15,9 @@ interface ClueAnswersProps {
   me: Player | null
   // What each answer won or lost: the clue's value or Daily Double wager.
   amount?: number
+  // The clue's correct response, shown for an answer Trebek ruled correct
+  // without anything typed (said out loud).
+  accepted?: AcceptedAnswers | null
 }
 
 function ClueAnswers({
@@ -18,6 +26,7 @@ function ClueAnswers({
   round,
   me,
   amount,
+  accepted = null,
 }: ClueAnswersProps) {
   if (answers.length === 0) {
     return null
@@ -25,6 +34,18 @@ function ClueAnswers({
 
   function playerName(id: number): string {
     return players.find(player => player.id === id)?.name ?? `Player ${id}`
+  }
+
+  function answerText(answer: ClueAnswer) {
+    if (answer.answer !== null) {
+      return answer.answer
+    }
+
+    if (answer.ruledByTrebek && answer.correct && accepted) {
+      return formatAcceptedAnswers(accepted)
+    }
+
+    return <em>{answer.ruledByTrebek ? 'nothing typed' : 'ran out of time'}</em>
   }
 
   // The question form is optional in the Jeopardy round, so a player who left
@@ -50,9 +71,7 @@ function ClueAnswers({
             </span>
 
             <span className="clue-answer-text">
-              {answer.answer === null
-                ? <em>{answer.ruledByTrebek ? 'nothing typed' : 'ran out of time'}</em>
-                : answer.answer}
+              {answerText(answer)}
               {questionRequired && !answer.correct && !answer.ruledByTrebek &&
                 answer.phrasedAsQuestion === false && (
                 <em> (not phrased as a question)</em>

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import type {
@@ -132,9 +132,31 @@ describe('TrebekDesk', () => {
   })
 
   test('pauses and resumes the clock', async () => {
-    const actions = renderDesk(trebekSession({ state: 'WAITING_FOR_BUZZER' }))
+    const actions = renderDesk(trebekSession({
+      state: 'WAITING_FOR_BUZZER',
+      phaseDurationMs: 10000,
+      phaseRemainingMs: 8000,
+    }))
     await userEvent.click(screen.getByRole('button', { name: 'Pause the clock' }))
     expect(actions.pause).toHaveBeenCalledOnce()
+  })
+
+  test("has nothing to pause in a phase that waits for Trebek, but can resume", async () => {
+    renderDesk(trebekSession({ state: 'REVEALING_CLUE' }))
+    expect(screen.queryByRole('button', { name: 'Pause the clock' })).not.toBeInTheDocument()
+    cleanup()
+
+    // A pause holds across phases, also into one without a clock.
+    const actions = renderDesk(trebekSession({ state: 'REVEALING_CLUE', paused: true }))
+    await userEvent.click(screen.getByRole('button', { name: 'Resume the clock' }))
+    expect(actions.resume).toHaveBeenCalledOnce()
+  })
+
+  test('picks for the chooser on the board, without a button of its own', () => {
+    renderDesk(trebekSession({ state: 'CHOOSING_CLUE', currentClue: null }))
+
+    expect(screen.getByText(/pick it for them on the board/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /pick/i })).not.toBeInTheDocument()
   })
 
   test('gives and takes away points', async () => {

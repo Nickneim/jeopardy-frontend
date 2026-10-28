@@ -63,4 +63,33 @@ describe('ClueAnswers', () => {
     expect(screen.queryByText(/not phrased as a question/)).not.toBeInTheDocument()
     expect(screen.getByText('ran out of time')).toBeInTheDocument()
   })
+
+  test('shows the correct response for a correct ruling without a typed answer', () => {
+    const outLoud = { ...notAQuestion, answer: null, correct: true, phrasedAsQuestion: null, ruledByTrebek: true }
+    const { unmount } = render(
+      <ClueAnswers
+        answers={[outLoud]}
+        players={[alice, bob]}
+        round="JEOPARDY"
+        me={bob}
+        accepted={{ required: 1, options: ['Bratislava'] }}
+      />,
+    )
+
+    expect(screen.getByRole('listitem')).toHaveTextContent('Bratislava')
+    expect(screen.queryByText('nothing typed')).not.toBeInTheDocument()
+
+    // A wrong one says nothing was typed.
+    unmount()
+    render(
+      <ClueAnswers
+        answers={[{ ...outLoud, correct: false }]}
+        players={[alice, bob]}
+        round="JEOPARDY"
+        me={bob}
+        accepted={{ required: 1, options: ['Bratislava'] }}
+      />,
+    )
+    expect(screen.getByText('nothing typed')).toBeInTheDocument()
+  })
 })

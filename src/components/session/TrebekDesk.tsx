@@ -85,15 +85,10 @@ function TrebekDesk({ session, view, actions }: TrebekDeskProps) {
     switch (state) {
       case 'CHOOSING_CLUE':
         return (
-          <>
-            <p className="trebek-note">
-              <span className="tv-hand">{chooser}</span> is choosing. If they
-              say it out loud, pick it for them on the board.
-            </p>
-            <div className="trebek-buttons">
-              {step('Pick the next clue for them', false)}
-            </div>
-          </>
+          <p className="trebek-note">
+            <span className="tv-hand">{chooser}</span> is choosing. If they
+            say it out loud, pick it for them on the board.
+          </p>
         )
 
       case 'CLUE_PICKED':
@@ -223,7 +218,9 @@ function TrebekDesk({ session, view, actions }: TrebekDeskProps) {
 
       {controls()}
 
-      {isPlaying && (
+      {/* A phase waiting for Trebek has no clock. A pause holds across
+          phases, so Resume stays while paused. */}
+      {isPlaying && (session.paused || session.phaseDurationMs !== null) && (
         <div className="trebek-buttons">
           <button
             type="button"
