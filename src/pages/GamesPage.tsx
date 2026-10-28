@@ -173,6 +173,11 @@ function GameRow({
             View
           </Link>
           {clueCount > 0 && (
+            <Link to={`/custom?game=${id}`} className="outline-button">
+              Host custom
+            </Link>
+          )}
+          {clueCount > 0 && (
             <button
               type="button"
               className="gold-button"

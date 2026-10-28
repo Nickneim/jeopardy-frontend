@@ -14,7 +14,7 @@ import {
   gameLoader,
 } from './api/games'
 import { clueLoader } from './api/clues'
-import { customShowAction } from './api/customShows'
+import { customShowAction, customShowLoader } from './api/customShows'
 import {
   homeLoader,
   joinSessionAction,
@@ -52,9 +52,11 @@ const router = createBrowserRouter([
         loader: clueLoader,
       },
       {
-        // The draft is in localStorage: no loader.
+        // The draft is in localStorage: the loader only fetches the game
+        // to start from, with "Host custom" in the catalog.
         path: 'custom',
         element: <CustomShowPage />,
+        loader: customShowLoader,
         action: customShowAction,
       },
       {

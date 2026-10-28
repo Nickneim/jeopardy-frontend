@@ -1,7 +1,11 @@
-import { redirect, type ActionFunctionArgs } from 'react-router'
+import {
+  redirect,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+} from 'react-router'
 import type { ClueType } from './clues'
 import { hasErrorCode } from './errors'
-import type { Game, GameCategory } from './games'
+import { getGame, type Game, type GameCategory } from './games'
 import {
   cleanPlayerName,
   createSession,
@@ -311,12 +315,15 @@ export function gameSource(game: Pick<Game, 'title' | 'gameDate'>): string {
   return `${show} · ${formatAirDate(game.gameDate)}`
 }
 
-// Fills a category with a stored one's clues, each on its own row.
+// Fills a category with a stored one's clues, each on its own row. Only a
+// whole game's import keeps its Daily Doubles: one category's would be
+// chosen by the host.
 export function importCategory(
   draft: Draft,
   position: CategoryPosition,
   imported: GameCategory,
   source: string,
+  dailyDoubleIds: ReadonlySet<number> = new Set(),
 ): Draft {
   return updateCategory(draft, position, () => ({
     name: imported.name,
@@ -332,7 +339,7 @@ export function importCategory(
           answer: clue.answer,
           clueType: clue.clueType,
           mediaUrl: clue.clueType === 'TEXT' ? null : clue.mediaUrl,
-          dailyDouble: false,
+          dailyDouble: dailyDoubleIds.has(clue.id),
           custom: false,
         }
         : null
@@ -359,6 +366,55 @@ export function importFinal(
       custom: false,
     },
   }
+}
+
+// A whole stored game as a draft, named after it, with its Daily Doubles:
+// every category in its own column, every clue on its own row.
+export function draftFromGame(game: Game): Draft {
+  const source = gameSource(game)
+  const dailyDoubleIds = new Set(game.dailyDoubleClueIds)
+  const rounds: [BoardRound, GameCategory[]][] = [
+    ['JEOPARDY', game.jeopardyRound],
+    ['DOUBLE_JEOPARDY', game.doubleJeopardyRound],
+  ]
+
+  let draft = { ...emptyDraft(), name: game.title }
+
+  for (const [round, categories] of rounds) {
+    for (const category of categories) {
+      // 1–6 in Jeopardy, 7–12 in Double Jeopardy.
+      const column = (category.columnNumber - 1) % COLUMNS
+      draft = importCategory(draft, { round, column }, category, source, dailyDoubleIds)
+    }
+  }
+
+  return game.finalJeopardy
+    ? importFinal(draft, game.finalJeopardy, source)
+    : draft
+}
+
+export interface CustomShowLoaderData {
+  // The game to start the board from (`?game=`), from "Host custom" in the
+  // catalog.
+  game: Game | null
+}
+
+export async function customShowLoader({
+  request,
+}: LoaderFunctionArgs): Promise<CustomShowLoaderData> {
+  const param = new URL(request.url).searchParams.get('game')
+
+  if (param === null) {
+    return { game: null }
+  }
+
+  const id = Number(param)
+
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Response('Invalid game ID', { status: 400 })
+  }
+
+  return { game: await getGame(id) }
 }
 
 // ---------- Hosting ----------

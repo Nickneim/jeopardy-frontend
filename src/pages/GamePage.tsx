@@ -67,6 +67,12 @@ function GamePage() {
               {showAll ? 'Show all clues' : 'Show all answers'}
             </button>
           )}
+
+          {playable && (
+            <Link to={`/custom?game=${game.id}`} className="outline-button">
+              Host custom
+            </Link>
+          )}
         </div>
 
         {playable

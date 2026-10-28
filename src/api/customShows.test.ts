@@ -7,6 +7,7 @@ import {
   customGameRequest,
   customShowAction,
   defaultCategoryName,
+  draftFromGame,
   emptyDraft,
   importCategory,
   importedCategoryIds,
@@ -26,7 +27,7 @@ import {
   type DraftClue,
 } from './customShows'
 import { ApiError } from './errors'
-import type { GameCategory } from './games'
+import type { Game, GameCategory } from './games'
 
 vi.mock('./client', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
 vi.mock('../sessionCode', async importOriginal => ({
@@ -86,6 +87,36 @@ describe('the draft', () => {
     expect(category.clues[0]).toMatchObject({ question: 'Its capital is <i>Reykjavik</i>', custom: false })
     expect(category.clues[1]).toMatchObject({ clueType: 'IMAGE', mediaUrl: 'http://j-archive.com/a.jpg' })
     expect(importedCategoryIds(draft)).toEqual(new Set([77]))
+  })
+
+  test('a whole game fills the board in its own columns, with its Daily Doubles', () => {
+    const game: Game = {
+      id: 8612,
+      title: 'Show #8612 - Friday, March 4, 2022',
+      gameDate: '2022-03-04',
+      season: '38',
+      jeopardyRound: [{ ...islands, id: 70, columnNumber: 2 }],
+      doubleJeopardyRound: [islands],
+      finalJeopardy: {
+        id: 90,
+        name: 'Poets',
+        columnNumber: 13,
+        comments: null,
+        clues: [{ id: 9, question: 'He wrote "Ozymandias"', answer: 'Shelley', rowNumber: 1, clueType: 'TEXT', mediaUrl: null }],
+      },
+      dailyDoubleClueIds: [3],
+    }
+
+    const draft = draftFromGame(game)
+
+    expect(draft.name).toBe('Show #8612 - Friday, March 4, 2022')
+    expect(draft.rounds.JEOPARDY[1]).toMatchObject({ name: 'Islands', sourceCategoryId: 70, source: 'Show #8612 · Mar 4, 2022' })
+    expect(draft.rounds.JEOPARDY[0].name).toBeNull()
+    // Column 10 is Double Jeopardy's fourth.
+    expect(draft.rounds.DOUBLE_JEOPARDY[3]).toMatchObject({ name: 'Islands', sourceCategoryId: 77 })
+    expect(draft.rounds.DOUBLE_JEOPARDY[3].clues[4]).toMatchObject({ answer: 'Greenland', dailyDouble: true })
+    expect(draft.rounds.DOUBLE_JEOPARDY[3].clues[0]?.dailyDouble).toBe(false)
+    expect(draft.final).toMatchObject({ name: 'Poets', answer: 'Shelley', sourceCategoryId: 90, custom: false })
   })
 
   test('clues swap rows within their column', () => {

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, test, vi } from 'vitest'
 import type { CustomGameProblem, HostCustomShowRequest } from '../api/customShows'
+import type { Game } from '../api/games'
 import CustomShowPage from './CustomShowPage'
 
 const problems: CustomGameProblem[] = [
@@ -16,16 +17,40 @@ const problems: CustomGameProblem[] = [
   },
 ]
 
-function renderPage(action: (body: HostCustomShowRequest) => unknown) {
+const game: Game = {
+  id: 8612,
+  title: 'Show #8612 - Friday, March 4, 2022',
+  gameDate: '2022-03-04',
+  season: '38',
+  jeopardyRound: [{
+    id: 70,
+    name: 'Islands',
+    columnNumber: 1,
+    comments: null,
+    clues: [{ id: 1, question: 'Its capital is Reykjavik', answer: 'Iceland', rowNumber: 1, clueType: 'TEXT', mediaUrl: null }],
+  }],
+  doubleJeopardyRound: [],
+  finalJeopardy: null,
+  dailyDoubleClueIds: [],
+}
+
+function renderPage(
+  action: (body: HostCustomShowRequest) => unknown,
+  { gameParam = false } = {},
+) {
   const router = createMemoryRouter([
     {
       path: '/custom',
       element: <CustomShowPage />,
+      loader: ({ request }) => ({
+        game: new URL(request.url).searchParams.has('game') ? game : null,
+      }),
       action: async ({ request }) => action(await request.json() as HostCustomShowRequest),
     },
-  ], { initialEntries: ['/custom'] })
+  ], { initialEntries: [gameParam ? '/custom?game=8612' : '/custom'] })
 
   render(<RouterProvider router={router} />)
+  return router
 }
 
 describe('CustomShowPage', () => {
@@ -34,7 +59,7 @@ describe('CustomShowPage', () => {
     const action = vi.fn().mockResolvedValue({ error: "This custom show can't be played: 2 problems", problems })
     renderPage(action)
 
-    await user.type(screen.getByLabelText('Your name'), 'Nico')
+    await user.type(await screen.findByLabelText('Your name'), 'Nico')
     await user.click(screen.getByRole('button', { name: 'Host live game' }))
 
     const rejected = await screen.findByRole('alert')
@@ -62,7 +87,7 @@ describe('CustomShowPage', () => {
     const user = userEvent.setup()
     renderPage(vi.fn())
 
-    await user.click(screen.getByRole('button', { name: 'Write the $200 clue in Category #1' }))
+    await user.click(await screen.findByRole('button', { name: 'Write the $200 clue in Category #1' }))
     const dialog = screen.getByRole('dialog')
     const [clue, response] = within(dialog).getAllByRole('textbox')
     await user.type(clue, 'The cousin from <i>Lisbon</i>')
@@ -87,5 +112,28 @@ describe('CustomShowPage', () => {
     await user.click(screen.getByRole('button', { name: 'Undo' }))
 
     expect(screen.queryByText('Response hidden')).not.toBeInTheDocument()
+  })
+
+  test('a game from the catalog fills an empty board', async () => {
+    const router = renderPage(vi.fn(), { gameParam: true })
+
+    expect(await screen.findByText('Loaded Show #8612 - Friday, March 4, 2022')).toBeInTheDocument()
+    expect(screen.getByLabelText('Show name')).toHaveValue('Show #8612 - Friday, March 4, 2022')
+    expect(screen.getByDisplayValue('Islands')).toBeInTheDocument()
+    // A reload doesn't load it again.
+    expect(router.state.location.search).toBe('')
+  })
+
+  test('a game from the catalog asks before replacing a board', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('jeopardy.customShow', JSON.stringify({ name: 'Family night', rounds: {}, final: {} }))
+    renderPage(vi.fn(), { gameParam: true })
+
+    const prompt = await screen.findByRole('alertdialog')
+    expect(screen.getByLabelText('Show name')).toHaveValue('Family night')
+
+    await user.click(within(prompt).getByRole('button', { name: 'Yes, replace it' }))
+
+    expect(screen.getByLabelText('Show name')).toHaveValue('Show #8612 - Friday, March 4, 2022')
   })
 })

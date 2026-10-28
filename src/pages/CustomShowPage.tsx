@@ -1,5 +1,10 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { useFetcher, type SubmitTarget } from 'react-router'
+import {
+  useFetcher,
+  useLoaderData,
+  useSearchParams,
+  type SubmitTarget,
+} from 'react-router'
 import {
   BOARD_ROUNDS,
   BOARD_SIZE,
@@ -8,6 +13,7 @@ import {
   clueValue,
   customGameRequest,
   dailyDoubleCount,
+  draftFromGame,
   emptyCategory,
   emptyDraft,
   emptyFinal,
@@ -34,11 +40,13 @@ import {
   type CategoryPosition,
   type CluePosition,
   type CustomGameProblem,
+  type CustomShowLoaderData,
   type Draft,
   type DraftClue,
   type HostCustomShowData,
   type HostCustomShowRequest,
 } from '../api/customShows'
+import type { Game } from '../api/games'
 import { getRememberedPlayerName, MAX_NAME_LENGTH } from '../api/sessions'
 import ClueQuestion from '../components/ClueQuestion'
 import BlindSwitch from '../components/custom/BlindSwitch'
@@ -70,8 +78,10 @@ type EditTarget =
   | { kind: 'clue', position: CluePosition }
   | { kind: 'final' }
 
-interface PendingFile {
-  fileName: string
+// A board waiting for the host to agree to replace theirs: from a file, or
+// a game from the catalog.
+interface PendingDraft {
+  name: string
   draft: Draft
 }
 
@@ -124,7 +134,7 @@ function CustomShowPage() {
   const [importing, setImporting] = useState<ImportTarget | null>(null)
   const [dragging, setDragging] = useState<DragItem | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [pendingFile, setPendingFile] = useState<PendingFile | null>(null)
+  const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [playerName, setPlayerName] = useState(getRememberedPlayerName)
   const fetcher = useFetcher<HostCustomShowData>()
@@ -135,6 +145,31 @@ function CustomShowPage() {
   const problems = !isHosting && hosted && fetcher.data?.problems
     ? openProblems(fetcher.data.problems, hosted, draft)
     : []
+
+  const { game } = useLoaderData() as CustomShowLoaderData
+  const [, setSearchParams] = useSearchParams()
+  const [loadedGame, setLoadedGame] = useState<Game | null>(null)
+
+  // A game from the catalog's "Host custom", once per arrival: it fills an
+  // empty board right away, and asks before replacing one.
+  if (game && game !== loadedGame) {
+    const loaded = draftFromGame(game)
+    setLoadedGame(game)
+
+    if (isEmptyDraft(draft)) {
+      change(() => loaded)
+      setToast(`Loaded ${game.title}`)
+    } else {
+      setPendingDraft({ name: game.title, draft: loaded })
+    }
+  }
+
+  // The parameter goes, so a reload doesn't load the game again.
+  useEffect(() => {
+    if (game) {
+      setSearchParams({}, { replace: true })
+    }
+  }, [game, setSearchParams])
 
   const setBlind = (value: boolean) => {
     setBlindState(value)
@@ -302,7 +337,7 @@ function CustomShowPage() {
       change(() => loaded)
       setToast(`Loaded ${file.name}`)
     } else {
-      setPendingFile({ fileName: file.name, draft: loaded })
+      setPendingDraft({ name: file.name, draft: loaded })
     }
   }
 
@@ -421,11 +456,11 @@ function CustomShowPage() {
             </p>
           )}
 
-          {pendingFile && (
+          {pendingDraft && (
             <div className="custom-prompt" role="alertdialog" aria-labelledby="file-prompt-title">
               <h2 id="file-prompt-title">Replace your board?</h2>
               <p>
-                {pendingFile.fileName} has {clueCount(pendingFile.draft)} of {BOARD_SIZE} clues.
+                {pendingDraft.name} has {clueCount(pendingDraft.draft)} of {BOARD_SIZE} clues.
                 Your current board and its {count} clues will be replaced. Export it
                 first if you want to keep it.
               </p>
@@ -434,8 +469,8 @@ function CustomShowPage() {
                   type="button"
                   className="gold-button"
                   onClick={() => {
-                    change(() => pendingFile.draft)
-                    setPendingFile(null)
+                    change(() => pendingDraft.draft)
+                    setPendingDraft(null)
                   }}
                 >
                   Yes, replace it
@@ -443,7 +478,7 @@ function CustomShowPage() {
                 <button type="button" className="outline-button" onClick={exportFile}>
                   Export mine first
                 </button>
-                <button type="button" className="outline-button" onClick={() => setPendingFile(null)}>
+                <button type="button" className="outline-button" onClick={() => setPendingDraft(null)}>
                   Cancel
                 </button>
               </div>
