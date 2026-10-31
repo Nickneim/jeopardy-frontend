@@ -59,7 +59,7 @@ describe('CustomShowPage', () => {
     const action = vi.fn().mockResolvedValue({ error: "This custom show can't be played: 2 problems", problems })
     renderPage(action)
 
-    await user.type(await screen.findByLabelText('Your name'), 'Nico')
+    await user.type(await screen.findByLabelText('Your name'), 'Alex')
     await user.click(screen.getByRole('button', { name: 'Host live game' }))
 
     const rejected = await screen.findByRole('alert')
@@ -68,7 +68,7 @@ describe('CustomShowPage', () => {
     expect(within(rejected).getByText('Category 3 has clues but no name')).toBeInTheDocument()
 
     expect(action).toHaveBeenCalledWith(expect.objectContaining({
-      playerName: 'Nico',
+      playerName: 'Alex',
       game: expect.objectContaining({ name: '', finalJeopardy: null }),
     }))
 

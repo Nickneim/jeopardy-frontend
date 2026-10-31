@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is the **frontend** of a multiplayer Jeopardy web app: React 19 + TypeScript + Vite, routing with `react-router` v8 (data router), HTTP with axios.
 
-The **backend** is a separate Spring Boot repository in the sibling folder `../backend` (same parent directory as this one), with its own `CLAUDE.md`. **`../backend/docs/api.md` is the contract between the two**: REST and STOMP endpoints, payloads, game session states, timings, error codes and ready-made TypeScript types (section 8). Read it before adding or changing any API call or type. If the frontend needs something the backend doesn't provide, the change belongs in the backend (and its `api.md`), not in a frontend workaround.
+The **backend** is a separate Spring Boot repository, [jeopardy-backend](https://github.com/Nickneim/jeopardy-backend), with its own `CLAUDE.md`. It's usually checked out next to this repository (as `../backend` or `../jeopardy-backend`); use that copy when it's there. **Its `docs/api.md` is the contract between the two**: REST and STOMP endpoints, payloads, game session states, timings, error codes and ready-made TypeScript types (section 8). Read it before adding or changing any API call or type. If the frontend needs something the backend doesn't provide, the change belongs in the backend (and its `api.md`), not in a frontend workaround.
+
+**This repository is public.** Never commit personal information (real names, email addresses, account ids), absolute paths from your machine, or secrets (passwords, keys, tokens, `.env` contents). Refer to files by repository-relative paths, to the backend by its repository, and keep machine-specific settings out of the tracked files.
 
 ## Commands
 
@@ -33,12 +35,12 @@ Vitest with jsdom and React Testing Library, configured in the `test` block of `
 ### End-to-end checks and the Stop hook
 
 - `pnpm e2e` runs `scripts/e2e/` against the real backend through the dev server (both must be running): real STOMP clients play the session rules and a whole Trebek game, then headless Chrome plays a whole game with several players, Trebek included. The `test-live-session` skill (`.claude/skills/`) says when and how to run them.
-- `.claude/settings.json` has a Stop hook, `scripts/stop-checks.mjs`, that runs build, lint and tests at the end of a turn when `src/`, `scripts/` or a config file changed since its last run. It's silent when they pass and hands failures back to Claude. Its state is in `node_modules/.cache/claude-stop-checks.json`: delete it to force a rerun.
+- `.claude/settings.json` has a Stop hook, `scripts/stop-checks.mjs`, that runs build, lint and tests at the end of a turn when `src/`, `scripts/` or a config file changed since its last run. It's silent when they pass and hands failures back to Claude.
 
 ### Running against the backend
 
-- The backend runs on `http://localhost:8080` (start it from `../backend`; see its CLAUDE.md for the database environment variables).
-- `vite.config.ts` proxies `/api` and `/ws` to the backend, so the frontend always uses relative `/api/...` and `/ws` URLs. The target is `BACKEND_URL`, default `http://localhost:8080`. The backend's Kubernetes setup (`../backend/k8s/README.md`) serves both through an Ingress on port 80: start the dev server with `BACKEND_URL=http://localhost` (in PowerShell, `$env:BACKEND_URL='http://localhost'; pnpm dev`).
+- The backend runs on `http://localhost:8080` (start it from the backend repository; see its CLAUDE.md for the database environment variables).
+- `vite.config.ts` proxies `/api` and `/ws` to the backend, so the frontend always uses relative `/api/...` and `/ws` URLs. The target is `BACKEND_URL`, default `http://localhost:8080`. The backend's Kubernetes setup (its `k8s/README.md`) serves both through an Ingress on port 80: start the dev server with `BACKEND_URL=http://localhost` (in PowerShell, `$env:BACKEND_URL='http://localhost'; pnpm dev`).
 
 ## Architecture
 

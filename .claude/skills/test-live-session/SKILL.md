@@ -17,7 +17,7 @@ description: Run the end-to-end checks for live game sessions against the real b
 
 ## Steps
 
-1. **Backend.** `curl -s -m 3 http://localhost:8080/api/game-sessions` must answer (or, when the dev server runs with `BACKEND_URL`, that address instead, e.g. `http://localhost` for the Kubernetes Ingress). If it doesn't, ask the user to start it from `../backend`. Don't start it yourself, because it needs their database environment variables.
+1. **Backend.** `curl -s -m 3 http://localhost:8080/api/game-sessions` must answer (or, when the dev server runs with `BACKEND_URL`, that address instead, e.g. `http://localhost` for the Kubernetes Ingress). If it doesn't, ask the user to start it from the backend repository. Don't start it yourself, because it needs their database environment variables.
 2. **Dev server.** If `http://localhost:5173` doesn't answer, start `pnpm dev` in the background. Stop it at the end only if you started it.
 3. **Run** `pnpm e2e`, or one script with `node scripts/e2e/<script>`. To save tokens, filter the output to what matters: `pnpm e2e 2>&1 | grep -E "^FAIL|checks? (passed|failed)|Screenshots"`. Show the full output only when something fails.
 4. **Screenshots.** `ui-flow.mjs` saves PNGs (host and player lobby, the closed view, the join choice, joining mid-game, Trebek's desk) to the folder it prints at the end. Look at them when the change is visual.
@@ -27,8 +27,8 @@ Settings, all optional: `GAME_ID` picks the game (default: the first playable on
 ## Reading results
 
 - **Exit 2** means a precondition is missing (no dev server, no backend, no playable game, no browser). The message says which.
-- **`FAIL`** is a real regression in the frontend or the backend. Check `../backend/docs/api.md` to see which side is wrong before changing anything. Per CLAUDE.md, backend issues get fixed in the backend, not worked around here.
+- **`FAIL`** is a real regression in the frontend or the backend. Check the backend's `docs/api.md` (see CLAUDE.md) to see which side is wrong before changing anything. Per CLAUDE.md, backend issues get fixed in the backend, not worked around here.
 
 ## Extending
 
-Add a scenario where it fits in the flow. Use `check(name, ok, detail)`. Shared helpers (`api`, `preflight`, `sleep`, `finish`, and `connect`/`waitFor` for STOMP clients, which record snapshots, errors and Trebek views) are in `scripts/e2e/lib.mjs`. In `ui-flow.mjs`, each player from `newPlayer(name)` has `goto`, `waitText`, `click(label)` (buttons and links by their starting text), `join(name)`, `eval(js)` and `screenshot(file)`. `window.confirm` always returns true. Wait for text before you interact, because pages load asynchronously.
+Add a scenario where it fits in the flow. Use `check(name, ok, detail)`. Shared helpers (`api`, `preflight`, `sleep`, `finish`, and `connect`/`waitFor` for STOMP clients, which record snapshots, errors and Trebek views) are in `scripts/e2e/lib.mjs`. In `ui-flow.mjs`, each player from `newPlayer(name)` has `goto`, `waitText`, `click(label)` (buttons and links by their starting text), `join(name)`, `eval(js)` and `screenshot(file)`. `window.confirm` throws, because the app must ask on the page instead (`ConfirmButton`). Wait for text before you interact, because pages load asynchronously.

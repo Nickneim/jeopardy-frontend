@@ -291,7 +291,7 @@ describe('customShowAction', () => {
     vi.mocked(put).mockResolvedValue({ id: SESSION_ID })
     vi.mocked(post).mockResolvedValue({ playerId: 1, token: 'secret' })
 
-    const response = await customShowAction(hostArgs('Nico')) as Response
+    const response = await customShowAction(hostArgs('Alex')) as Response
 
     expect(put).toHaveBeenCalledWith(
       `/game-sessions/${SESSION_ID}`,
@@ -312,7 +312,7 @@ describe('customShowAction', () => {
       problems,
     ))
 
-    expect(await customShowAction(hostArgs('Nico'))).toEqual({
+    expect(await customShowAction(hostArgs('Alex'))).toEqual({
       error: "This custom show can't be played: 1 problem",
       problems,
     })

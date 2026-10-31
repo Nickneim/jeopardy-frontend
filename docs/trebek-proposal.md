@@ -53,7 +53,7 @@ Switching to `TREBEK` **moves the host out of `players`** into a new response fi
 ```json
 "hostMode": "TREBEK",
 "hostPlayerId": 1,
-"trebek": { "id": 1, "name": "Nico", "away": false },
+"trebek": { "id": 1, "name": "Alex", "away": false },
 "players": [ { "id": 2, "name": "Ken", … }, { "id": 3, "name": "Amy", … } ]
 ```
 
