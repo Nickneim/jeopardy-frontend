@@ -1,23 +1,10 @@
 # Jeopardy! frontend
 
-The browser client for a multiplayer Jeopardy! game you play live with friends. Pick one of thousands of real games (or write your own board), share a 5-character code, and everyone plays together on a screen styled like the TV show: choosing clues, racing to buzz in, wagering on Daily Doubles and Final Jeopardy.
+A browser client for a multiplayer Jeopardy! game.
 
 The server is in a separate repository: **[jeopardy-backend](https://github.com/Nickneim/jeopardy-backend)**.
 
 **Live demo:** <https://d14x3ygmehrd5x.cloudfront.net>. The game server is started on demand to keep costs down, so the page often says it's offline.
-
-## Features
-
-- **Lobby.** Host any game from the catalog, a random one, or a custom show in one step, then share the session code or link. The host sets the timers, whether players can join late and which media clue types (images, video, sound) to leave out. A live games list shows every session, with search, filters and a "Join with a code" field.
-- **Live board.** Every round opens with a title card, the board fills in, and a picked clue grows out of its cell onto the screen. Scores, whose turn it is and the countdown sit under it, with a podium for each player.
-- **Buzzer.** Your podium has a buzz button (or press Space); the first player to buzz once the buzzers open gets to answer, against the clock. Answers are typed and checked on the server, which forgives typos and alternative wordings, and the screen shows the correct response and what else would have counted. From Double Jeopardy on, answers must be phrased as a question.
-- **Daily Doubles.** Announced before the wager, with the wager limits for your score.
-- **Final Jeopardy.** Everyone wagers and answers in secret, then the reveal goes one player at a time, lowest score first: the answer, the wager, the new score.
-- **Trebek host mode.** Instead of playing, the host can run the show from a desk beside the screen: they see each clue and its correct response first, advance the game, rule on answers, fix scores and pause the clock.
-- **Custom show editor.** Build a whole board in the browser, with undo and redo, Daily Double placement, media clues and previews of how each clue will look in the game. Import categories from real games, start from any stored game, save the board to a file and load it back. The draft is kept in your browser until you host it.
-- **Reconnecting.** Refresh the page or lose your connection and you're back in your seat with your score. Anyone without a seat can watch as a spectator and join later while joining is open.
-- **Browsing.** A sortable, filterable catalog of games by season, title and air date, and each game's full board with its answers.
-- **Works on phones.** The board becomes a list of categories, and the podiums and controls rearrange to fit.
 
 ## Tech stack
 
